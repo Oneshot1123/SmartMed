@@ -1,0 +1,415 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&display=swap');
+
+:root {
+  /* Goat Design System - Sterile Glassmorphism 3.0 */
+  --bg-deep: #0B0E14;
+  --surface: rgba(22, 28, 39, 0.7);
+  --surface-border: rgba(255, 255, 255, 0.08);
+
+  --cyan-glow: #22D3EE;
+  --cyan-muted: rgba(34, 211, 238, 0.2);
+  --emerald-heal: #34D399;
+  --rose-alert: #F43F5E;
+  --amber-caution: #FBBF24;
+
+  --text-primary: #F8FAFC;
+  --text-muted: #94A3B8;
+
+  --radius-xl: 32px;
+  --radius-lg: 20px;
+  --radius-md: 12px;
+
+  --glass-blur: blur(32px);
+  --transition-fluid: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* --- Dynamic Mesh Background --- */
+.mesh-gradient {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background: radial-gradient(circle at 10% 20%, rgba(34, 211, 238, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(52, 211, 153, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.05) 0%, transparent 50%);
+  filter: blur(80px);
+  animation: mesh-float 20s infinite alternate;
+}
+
+@keyframes mesh-float {
+  0% {
+    transform: scale(1);
+  }
+
+  100% {
+    transform: scale(1.1) translate(2%, 2%);
+  }
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* --- Layout Shell --- */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.content-section {
+  display: none;
+  animation: fade-up 0.4s var(--transition-fluid);
+}
+
+.content-section.active {
+  display: block;
+}
+
+/* Sidebar */
+nav.sidebar {
+  width: 280px;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--surface-border);
+  padding: 2.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  z-index: 100;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-left: 0.5rem;
+}
+
+.logo-icon {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, var(--cyan-glow), #0EA5E9);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px var(--cyan-muted);
+}
+
+.nav-logo h2 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.5rem;
+  letter-spacing: -1px;
+}
+
+.nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 500;
+  transition: var(--transition-fluid);
+}
+
+.nav-item.active {
+  background: var(--cyan-muted);
+  color: var(--cyan-glow);
+}
+
+.nav-item:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* Main Dashboard Content */
+main.content {
+  flex: 1;
+  padding: 2.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
+}
+
+h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 800;
+}
+
+.clinical-tag {
+  font-size: 0.9rem;
+  color: var(--cyan-glow);
+  font-weight: 600;
+  letter-spacing: 2px;
+  display: block;
+}
+
+/* --- Bento 3.0 Grid --- */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-rows: minmax(160px, auto);
+  gap: 1.5rem;
+}
+
+.goat-card {
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-xl);
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition-fluid);
+}
+
+.goat-card:hover {
+  transform: translateY(-8px) scale(1.01);
+  border-color: rgba(34, 211, 238, 0.3);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Card Header */
+.card-titling {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.icon-wrap {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan-glow);
+}
+
+.card-titling h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+}
+
+/* Grid Specifics */
+.col-4 {
+  grid-column: span 4;
+}
+
+.col-2 {
+  grid-column: span 2;
+}
+
+.row-2 {
+  grid-row: span 2;
+}
+
+/* Status Badge Pro */
+.status-indicator {
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  background: rgba(34, 211, 238, 0.05);
+  border-left: 4px solid var(--cyan-glow);
+}
+
+.status-indicator.taken {
+  border-color: var(--emerald-heal);
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.status-indicator.missed {
+  border-color: var(--rose-alert);
+  background: rgba(244, 63, 94, 0.05);
+}
+
+.status-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 15px currentColor;
+}
+
+/* Inventory Bars */
+.inv-bar-container {
+  margin-bottom: 1.5rem;
+}
+
+.inv-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.bar-bg {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  transition: width 1s ease;
+}
+
+/* --- Buttons & Inputs --- */
+.goat-btn {
+  background: linear-gradient(135deg, var(--cyan-glow), #0EA5E9);
+  color: var(--bg-deep);
+  border: none;
+  padding: 1.25rem;
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  transition: var(--transition-fluid);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.goat-btn:hover {
+  filter: brightness(1.1);
+  transform: scale(1.02);
+  box-shadow: 0 0 25px var(--cyan-muted);
+}
+
+.input-group {
+  margin-bottom: 1.25rem;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+input,
+select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--surface-border);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  color: white;
+  font-family: 'Inter', sans-serif;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--cyan-glow);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* --- Auth Plate --- */
+#auth-container {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-deep);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  width: 440px;
+  padding: 4rem;
+  text-align: center;
+  background: var(--surface);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-xl);
+}
+
+/* Animations */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.8s var(--transition-fluid) backwards;
+}
+
+/* --- Custom Chart Area --- */
+.chart-box {
+  position: relative;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#adherenceChart {
+  max-height: 260px;
+}
+
+.chart-center {
+  position: absolute;
+  text-align: center;
+}
+
+.score-main {
+  font-family: 'Outfit', sans-serif;
+  font-size: 3rem;
+  font-weight: 900;
+}
+
+.score-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}

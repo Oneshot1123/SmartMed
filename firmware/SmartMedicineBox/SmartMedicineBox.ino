@@ -94,15 +94,19 @@ SystemState currentState = IDLE;
 unsigned long monitoringStartTime = 0;
 const unsigned long MONITORING_DURATION = 60000;
 int activeCompartment = -1;
+// Copy (not an index) of the schedule that fired. fetchSchedules() rewrites schedules[]
+// every 30s, which can happen inside the 60s monitoring window -- an index would go stale.
+Schedule activeSchedule;
 int lastAlarmHour = -1;
 int lastAlarmMinute = -1;
 
 // Prototypes
 void triggerHardwareTest();
 void fetchSchedules();
-void reportStatus(String status);
+void reportStatus(String status, const Schedule &s);
 void sendHeartbeat();
 bool isHandDetected(int comp);
+time_t currentEpoch();
 
 bool isHandDetected(int comp) {
   if (comp == 1) return digitalRead(ir1Pin) == LOW; 
@@ -111,31 +115,49 @@ bool isHandDetected(int comp) {
   return false;
 }
 
+// Wall-clock epoch (seconds). NTP when available, RTC otherwise.
+// Never millis() -- that is uptime, which cannot be compared across reboots.
+time_t currentEpoch() {
+  time_t now = time(nullptr);
+  if (now > 1600000000) return now; // sane value => NTP has synced
+  return (time_t) rtc.now().unixtime();
+}
+
 void sendHeartbeat() {
   static unsigned long lastHeartbeat = 0;
   if (millis() - lastHeartbeat < 30000) return;
   lastHeartbeat = millis();
   FirebaseJson hb;
-  hb.set("lastSeen", String(millis()));
+  hb.set("lastSeen", (double) currentEpoch()); // unix seconds, so the dashboard can age it
+  hb.set("uptimeMs", (double) millis());
   hb.set("status", "online-i2c");
   Firebase.RTDB.updateNode(&fbdo, "patients/" + patientID + "/heartbeat", &hb);
 }
 
-void reportStatus(String status) {
+// Logs one dose event. The schedule that fired is recorded alongside the outcome so the
+// dashboard can compute timing adherence (see RESEARCH_BASIS.md, P2) -- without
+// scheduledTime there is no way to know whether a dose was on time or three hours late.
+void reportStatus(String status, const Schedule &s) {
   struct tm ti;
   char timeStr[9]; char dateStr[11];
-  char isoTime[25];
-  
+  char isoTime[25]; char schedStr[6];
+  int nowSecOfDay;
+
   if (getLocalTime(&ti)) {
      sprintf(timeStr, "%02d:%02d", ti.tm_hour, ti.tm_min);
      sprintf(dateStr, "%04d-%02d-%02d", ti.tm_year + 1900, ti.tm_mon + 1, ti.tm_mday);
      sprintf(isoTime, "%04d-%02d-%02dT%02d:%02d:%02dZ", ti.tm_year + 1900, ti.tm_mon + 1, ti.tm_mday, ti.tm_hour, ti.tm_min, ti.tm_sec);
+     nowSecOfDay = ti.tm_hour * 3600 + ti.tm_min * 60 + ti.tm_sec;
   } else {
      DateTime now = rtc.now();
      sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
      sprintf(dateStr, "%04d-%02d-%02d", now.year(), now.month(), now.day());
      sprintf(isoTime, "%04d-%02d-%02dT%02d:%02d:%02dZ", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+     nowSecOfDay = now.hour() * 3600 + now.minute() * 60 + now.second();
   }
+
+  sprintf(schedStr, "%02d:%02d", s.hour, s.minute);
+  long delaySec = (long) nowSecOfDay - (long) (s.hour * 3600 + s.minute * 60);
 
   FirebaseJson updateData;
   updateData.set("current_status/state", status);
@@ -146,7 +168,17 @@ void reportStatus(String status) {
   hist.set("date", String(dateStr));
   hist.set("time", String(timeStr));
   hist.set("status", status);
+  hist.set("medName", s.medName);
+  hist.set("compartment", s.compartment);
+  hist.set("scheduledTime", String(schedStr));
+  hist.set("delaySec", (double) delaySec);
+  hist.set("epoch", (double) currentEpoch());
   Firebase.RTDB.pushJSON(&fbdo, "history/" + patientID, &hist);
+
+  Serial.print("Logged "); Serial.print(status);
+  Serial.print(" for "); Serial.print(s.medName);
+  Serial.print(" (due "); Serial.print(schedStr);
+  Serial.print(", delay "); Serial.print(delaySec); Serial.println("s)");
 }
 
 void fetchSchedules() {
@@ -376,6 +408,7 @@ void loop() {
       if (timeMatch && dateMatch && isNewMinute) {
         lastAlarmHour = curH; lastAlarmMinute = curM; // Record trigger time
         activeCompartment = schedules[i].compartment;
+        activeSchedule = schedules[i];
         currentState = REMINDER_ACTIVE;
         monitoringStartTime = millis();
         lcd.clear(); lcd.print("DUE: "); lcd.print(schedules[i].medName);
@@ -404,14 +437,14 @@ void loop() {
     
     if (isHandDetected(activeCompartment)) {
       digitalWrite(buzzerPin, LOW); digitalWrite(yellowLed, LOW); digitalWrite(greenLed, HIGH);
-      lcd.clear(); lcd.print("TAKEN!"); reportStatus("Taken");
+      lcd.clear(); lcd.print("TAKEN!"); reportStatus("Taken", activeSchedule);
       delay(3000); digitalWrite(greenLed, LOW);
       currentState = IDLE; activeCompartment = -1;
     }
-    
-    if (millis() - monitoringStartTime > 60000) {
+
+    if (millis() - monitoringStartTime > MONITORING_DURATION) {
       digitalWrite(buzzerPin, LOW); digitalWrite(yellowLed, LOW); digitalWrite(redLed, HIGH);
-      lcd.clear(); lcd.print("MISSED!"); reportStatus("Missed");
+      lcd.clear(); lcd.print("MISSED!"); reportStatus("Missed", activeSchedule);
       delay(3000); digitalWrite(redLed, LOW);
       currentState = IDLE; activeCompartment = -1;
     }

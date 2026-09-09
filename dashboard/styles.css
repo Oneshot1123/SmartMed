@@ -310,3 +310,243 @@ td {
 .animate-fade-up {
   animation: fadeUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
+
+/* ==========================================================================
+   ANALYTICS SECTION
+   Palette note: the two trend series use #0e9f6e / #c2410c rather than the
+   dashboard's --emerald-heal / --amber-caution. Those two sit outside the
+   dark-mode OKLCH lightness band and separate by only DeltaE 8.9 under protanopia;
+   these steps clear every check (CVD 10.2, normal-vision 28.0).
+   ========================================================================== */
+
+.span-3 { grid-column: span 3; }
+
+/* Window switch (segmented control) */
+.window-switch {
+  display: inline-flex;
+  background: var(--bg-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: 50px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.window-switch button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.window-switch button:hover { color: var(--text-primary); }
+
+.window-switch button.active {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* KPI tiles */
+.metric-tile { display: flex; flex-direction: column; }
+
+.metric-value {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1.1;
+  margin: 0.35rem 0 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-sub {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-note {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-top: auto;
+  padding-top: 1rem;
+  opacity: 0.75;
+}
+
+/* Legend: identity is never carried by color alone -- every swatch has its label */
+.chart-legend {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.chart-legend span { display: inline-flex; align-items: center; gap: 7px; }
+
+.swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.swatch-line {
+  width: 16px;
+  height: 0;
+  border-radius: 0;
+  border-top: 2px dashed var(--text-muted);
+}
+
+/* Miss-rate heatmap */
+.heatmap-grid {
+  display: grid;
+  gap: 2px; /* the 2px surface gap that keeps adjacent cells legible as separate marks */
+  font-size: 0.7rem;
+}
+
+.heatmap-cell {
+  height: 30px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+  transition: outline-color 0.15s ease;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+
+.heatmap-cell:hover { outline-color: var(--text-primary); }
+
+.heatmap-cell.empty {
+  background: rgba(255, 255, 255, 0.03);
+  color: transparent;
+}
+
+/* Low-sample cells are dimmed: one miss out of one dose is 100%, and should not
+   read as loudly as one miss out of twenty. */
+.heatmap-cell.sparse { opacity: 0.55; }
+
+.heatmap-axis {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  letter-spacing: 0.5px;
+}
+
+.heatmap-axis.col { justify-content: center; padding-bottom: 4px; }
+.heatmap-axis.row { justify-content: flex-end; padding-right: 10px; }
+
+.heatmap-scale {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 1.25rem;
+}
+
+.scale-ramp {
+  flex: 1;
+  height: 8px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #3f1220, #9f1239, #e11d48, #fb7185);
+}
+
+/* Fact list */
+.fact-list { display: flex; flex-direction: column; gap: 0.85rem; }
+
+.fact-list div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.fact-list div:last-child { border-bottom: none; padding-bottom: 0; }
+.fact-list dt { color: var(--text-muted); font-size: 0.82rem; }
+.fact-list dd {
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Methods panel */
+.methods-panel summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.methods-panel summary::-webkit-details-marker { display: none; }
+
+.methods-panel summary::before {
+  content: '\25B8';
+  color: var(--text-muted);
+  display: inline-block;
+  margin-right: 10px;
+  transition: transform 0.2s ease;
+}
+
+.methods-panel[open] summary::before { transform: rotate(90deg); }
+
+.methods-panel table { margin-top: 1.5rem; font-size: 0.85rem; }
+.methods-panel td, .methods-panel th { vertical-align: top; padding: 0.75rem 1rem 0.75rem 0; }
+.methods-panel .formula {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--cyan-data);
+}
+
+.methods-citation {
+  margin-top: 1.5rem;
+  padding: 1.15rem 1.35rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--surface-border);
+  border-left: 3px solid var(--cyan-data);
+  border-radius: 12px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+/* Empty states: say why there is nothing, never render NaN */
+.empty-state {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--surface-border);
+  border-radius: 12px;
+  margin-top: 1rem;
+}
+
+/* Simulated-data banner */
+.sim-banner {
+  grid-column: span 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.85rem 1.25rem;
+  background: var(--amber-glow);
+  border: 1px solid var(--amber-caution);
+  border-radius: 12px;
+  font-size: 0.83rem;
+  color: var(--amber-caution);
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .grid { grid-template-columns: 1fr; }
+  .span-2, .span-3, .full-width, .sim-banner { grid-column: span 1; }
+}

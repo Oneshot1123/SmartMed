@@ -20,6 +20,7 @@ let adherenceChart;
 let caregiverUID = null;
 let patientID = null; // Currently selected patient
 let currentSchedules = {};
+let currentHistory = {};  // full dose-event log for the selected patient; feeds the analytics
 
 const authView = document.getElementById('auth-view');
 const dashboardView = document.getElementById('dashboard-view');
@@ -85,6 +86,11 @@ navItems.forEach(item => {
         item.classList.add('active');
         const targetId = 'section-' + item.id.replace('nav-', '');
         document.getElementById(targetId).style.display = 'block';
+
+        // Chart.js measures its canvas on creation. If the chart was built while this
+        // section was display:none it got a zero-sized box, so repaint now that the
+        // section is actually laid out.
+        if (item.id === 'nav-analytics') refreshAnalytics();
     });
 });
 
@@ -97,11 +103,32 @@ function initDashboard() {
     attachSimSuiteListeners();
 }
 
+/*
+ * Surfaces a database failure instead of letting it vanish.
+ *
+ * Firebase rejects reads and writes silently unless you ask: .set() returns a promise
+ * nobody was checking, and .on() takes a second "cancel" callback nobody was passing.
+ * The most common cause is Realtime Database security rules denying access.
+ */
+function reportDbError(what, err) {
+    const msg = (err && err.message) || String(err);
+    console.error(`[SmartMed] Failed to ${what}:`, err);
+    showToast(`Could not ${what}: ${msg}`, true);
+
+    if (/permission|denied/i.test(msg)) {
+        showToast(
+            'Firebase is refusing access. In Firebase Console > Realtime Database > Rules, ' +
+            'allow signed-in users: {"rules":{".read":"auth != null",".write":"auth != null"}}',
+            true
+        );
+    }
+}
+
 function attachCaregiverListeners() {
     db.ref(`caregivers/${caregiverUID}/patients`).on('value', snap => {
         const patients = snap.val();
         renderPatientsGrid(patients);
-        
+
         // Auto-select first patient if none selected
         if (!patientID && patients) {
             const firstId = Object.keys(patients)[0];
@@ -109,7 +136,7 @@ function attachCaregiverListeners() {
         } else if (!patients) {
             switchPatient(null);
         }
-    });
+    }, err => reportDbError('load your patient list', err));
 }
 
 function renderPatientsGrid(patients) {
@@ -172,26 +199,33 @@ function attachAddPatientListeners() {
             notes: document.getElementById('new-p-notes').value
         };
 
-        // Link to Caregiver
-        db.ref(`caregivers/${caregiverUID}/patients/${newUID}`).set(payload);
-        // Initialize Patient Profile
-        db.ref(`patients/${newUID}/profile`).set(payload);
-        // Set Default Status
-        db.ref(`patients/${newUID}/current_status`).set({ state: "Waiting", last_updated: new Date().toISOString() });
-
-        form.reset();
-        formContainer.style.display = 'none';
-        showToast(`Patient ${name} added successfully!`);
+        // Wait for all three writes before claiming success. Previously this reported
+        // "added successfully" synchronously, so a rejected write (bad security rules,
+        // no network) still showed a success toast and then silently did nothing.
+        Promise.all([
+            db.ref(`caregivers/${caregiverUID}/patients/${newUID}`).set(payload),
+            db.ref(`patients/${newUID}/profile`).set(payload),
+            db.ref(`patients/${newUID}/current_status`).set({ state: "Waiting", last_updated: new Date().toISOString() })
+        ]).then(() => {
+            form.reset();
+            formContainer.style.display = 'none';
+            showToast(`Patient ${name} added successfully!`);
+        }).catch(err => reportDbError('add patient', err));
     };
 }
 
 let activeListeners = [];
 function switchPatient(uid, name = "") {
     patientID = uid;
-    
+
     // Clear existing listeners
     activeListeners.forEach(l => db.ref(l.path).off('value', l.callback));
     activeListeners = [];
+
+    // Drop the previous patient's data so nothing bleeds into the new patient's analytics
+    currentHistory = {};
+    currentSchedules = {};
+    refreshAnalytics();
 
     // Clear UI Data
     if (!uid) {
@@ -246,17 +280,22 @@ function attachRealTimeListeners() {
     const listeners = [
         { path: `patients/${patientID}`, cb: snap => { if(snap.val()) updateDashboardUI(snap.val()); } },
         { path: `history/${patientID}`, cb: snap => updateHistoryTable(snap.val(), 'history-body'), query: ref => ref.limitToLast(5) },
-        { path: `history/${patientID}`, cb: snap => updateFullHistoryTable(snap.val()) },
+        { path: `history/${patientID}`, cb: snap => {
+            currentHistory = snap.val() || {};
+            updateFullHistoryTable(currentHistory);
+            refreshAnalytics();
+        }},
         { path: `schedules/${patientID}`, cb: snap => {
             currentSchedules = snap.val() || {};
             updateSchedulerUI(currentSchedules);
-            calculateNextDose(); 
+            calculateNextDose();
+            refreshAnalytics();
         }}
     ];
 
     listeners.forEach(l => {
         const ref = l.query ? l.query(db.ref(l.path)) : db.ref(l.path);
-        const callback = ref.on('value', l.cb);
+        const callback = ref.on('value', l.cb, err => reportDbError(`read ${l.path}`, err));
         activeListeners.push({ path: l.path, callback });
     });
 }
@@ -271,14 +310,11 @@ function updateDashboardUI(data) {
             data.current_status.last_updated ? data.current_status.last_updated.split('T')[1].substring(0,5) : "--:--";
     }
 
-    if (data.analytics) {
-        const taken = data.analytics.total_taken || 0;
-        const missed = data.analytics.total_missed || 0;
-        document.getElementById('stat-taken').textContent = taken;
-        document.getElementById('stat-missed').textContent = missed;
-        adherenceChart.data.datasets[0].data = [taken, missed];
-        adherenceChart.update();
-    }
+    // Taken/Missed are DERIVED from the event log rather than read from
+    // patients/{id}/analytics. That stored counter is only ever incremented by the
+    // Sim-Suite -- the firmware never touches it -- so it reads 0 for real device
+    // activity. The log is the source of truth.
+    updateOverallSuccess();
 
     if (data.profile) {
         // Only update matrix elements if they exist (they might be in the grid now)
@@ -348,7 +384,8 @@ function updateSchedulerUI(scheduleData) {
 
 window.deleteSchedule = (id) => {
     if (confirm("Delete this medication schedule?")) {
-        db.ref(`schedules/${patientID}/${id}`).remove();
+        db.ref(`schedules/${patientID}/${id}`).remove()
+            .catch(err => reportDbError('delete schedule', err));
     }
 };
 
@@ -375,20 +412,46 @@ function attachSchedulerListeners() {
         }).then(() => {
             form.reset();
             showToast(`Schedule added for ${medName}.`);
-        });
+        }).catch(err => reportDbError('add schedule', err));
     };
 }
 
+// Counts Taken/Missed straight from the event log and repaints the doughnut.
+function updateOverallSuccess() {
+    let taken = 0, missed = 0;
+    Object.values(currentHistory || {}).forEach(log => {
+        if (!log) return;
+        if (log.status === 'Taken') taken++;
+        else if (log.status === 'Missed') missed++;
+    });
+
+    document.getElementById('stat-taken').textContent = taken;
+    document.getElementById('stat-missed').textContent = missed;
+    if (adherenceChart) {
+        adherenceChart.data.datasets[0].data = [taken, missed];
+        adherenceChart.update();
+    }
+}
+
 function calculateRefillDate(data) {
-    // Simplified Prediction: assuming 1 pill per dose, 3 times a day
-    const inventory = 14; // Mock inventory if not in DB
-    const pillsLeft = data.inventory ? data.inventory.count : 14;
-    const dailyDoses = Object.keys(data.schedule).length || 3;
+    // Doses per day comes from currentSchedules (populated from schedules/{patientID}).
+    // It previously read data.schedule -- a node under patients/{id} that nothing ever
+    // writes -- so this threw a TypeError on every status update and killed the card.
+    const dailyDoses = Object.keys(currentSchedules || {}).length || 3;
+    const pillsLeft = data.inventory ? data.inventory.count : 14; // no inventory node yet
     const daysLeft = Math.floor(pillsLeft / dailyDoses);
-    
+
     document.getElementById('inv-count').textContent = pillsLeft + " Pills";
-    document.getElementById('inv-fill').style.width = (pillsLeft / 30 * 100) + "%";
+    document.getElementById('inv-fill').style.width = Math.min(pillsLeft / 30 * 100, 100) + "%";
     document.getElementById('refill-prediction').textContent = `Refill expected in ${daysLeft} days.`;
+}
+
+// Hands the raw log and regimen to the analytics layer, which does all the maths.
+function refreshAnalytics() {
+    if (window.SmedAnalyticsUI) {
+        window.SmedAnalyticsUI.render(currentHistory, currentSchedules);
+    }
+    updateOverallSuccess();
 }
 
 function updateHistoryTable(historyData, containerId) {
@@ -409,10 +472,27 @@ function updateHistoryTable(historyData, containerId) {
         tr.innerHTML = `
             <td style="color: var(--text-muted); padding-left: 1rem;">${log.time}</td>
             <td style="font-weight: 700; color: ${statusColor}">● ${log.status.toUpperCase()}</td>
-            <td style="color: var(--text-muted);">Comp 1</td>
+            <td style="color: var(--text-muted);">${log.compartment ? 'Comp ' + log.compartment : '--'}</td>
         `;
         tbody.appendChild(tr);
     });
+}
+
+// Detail column for the clinical log. Records written before the firmware started
+// logging the schedule that fired have none of these fields, so it degrades gracefully.
+function describeLog(log) {
+    const bits = [];
+    if (log.medName) bits.push(log.medName);
+    if (log.scheduledTime) bits.push(`due ${log.scheduledTime}`);
+    else if (log.scheduled_time) bits.push(`due ${log.scheduled_time}`);
+    if (typeof log.delaySec === 'number' && log.status === 'Taken') {
+        const mins = Math.round(log.delaySec / 60);
+        if (mins > 0) bits.push(`${mins} min late`);
+        else if (mins < 0) bits.push(`${-mins} min early`);
+        else bits.push('on time');
+    }
+    if (log.simulated) bits.push('simulated');
+    return bits.length ? bits.join(' · ') : '--';
 }
 
 function updateFullHistoryTable(historyData) {
@@ -434,7 +514,7 @@ function updateFullHistoryTable(historyData) {
             <td>${log.date}</td>
             <td>${log.time}</td>
             <td style="font-weight: 700; color: ${statusColor}">${log.status}</td>
-            <td style="color: var(--text-muted)">Scheduled: ${log.scheduled_time || "--:--"}</td>
+            <td style="color: var(--text-muted)">${describeLog(log)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -444,9 +524,123 @@ function updateFullHistoryTable(historyData) {
 function attachSimSuiteListeners() {
     const takenBtn = document.getElementById('sim-taken');
     const missedBtn = document.getElementById('sim-missed');
-    
+    const seedBtn = document.getElementById('seed-history');
+    const clearBtn = document.getElementById('clear-sim');
+
     if (takenBtn) takenBtn.onclick = () => simulateEvent("Taken");
     if (missedBtn) missedBtn.onclick = () => simulateEvent("Missed");
+    if (seedBtn) seedBtn.onclick = () => seedHistory();
+    if (clearBtn) clearBtn.onclick = () => clearSimulatedData();
+}
+
+/*
+ * Seeds synthetic dose events against the patient's real schedules.
+ *
+ * The generated behaviour is deliberately structured rather than uniformly random, so the
+ * analytics have something real to find:
+ *   - a weekend effect (adherence drops Sat/Sun)
+ *   - evening drift (late-day doses are missed more often, and taken later when taken)
+ *   - occasional double IR triggers, which the P2 30-minute rule must collapse
+ *
+ * These are the patterns Burnier (Front Pharmacol 2018;9:1540) describes electronic
+ * monitoring as uniquely able to reveal. Every record is tagged `simulated: true`.
+ */
+function seedHistory() {
+    if (!patientID) { showToast("Select a patient first!", true); return; }
+
+    const schedules = Object.values(currentSchedules || {});
+    if (!schedules.length) {
+        showToast("Add at least one schedule before seeding history.", true);
+        return;
+    }
+
+    const days = Math.max(1, Math.min(180, parseInt(document.getElementById('seed-days').value, 10) || 60));
+    const A = window.SmedAnalytics;
+    const payload = {};
+    let generated = 0;
+
+    const today = new Date();
+    for (let d = days - 1; d >= 0; d--) {
+        const day = A.addDays(today, -d);
+        const dateStr = A.dateKey(day);
+        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+
+        schedules.forEach(s => {
+            const mins = A.timeToMinutes(s.time);
+            if (mins === null) return;
+            // "once" schedules only fire on their own date
+            if (s.frequency !== 'daily' && s.date !== dateStr) return;
+            if (s.frequency === 'daily' && s.date && dateStr < s.date) return;
+
+            const isEvening = mins >= 19 * 60;
+            let pTaken = 0.90;
+            if (isWeekend) pTaken -= 0.12;
+            if (isEvening) pTaken -= 0.15;
+
+            const scheduledTime = A.minutesToTime(mins);
+            const takenNow = Math.random() < pTaken;
+
+            if (!takenNow) {
+                addSeed(payload, dateStr, A.minutesToTime(mins + 1), "Missed", s, scheduledTime, 60);
+                generated++;
+                return;
+            }
+
+            // Lateness: normally a few minutes, longer in the evening, occasionally much longer.
+            let delayMin = Math.round(Math.random() * 12) + (isEvening ? Math.round(Math.random() * 30) : 0);
+            if (Math.random() < 0.08) delayMin += 45 + Math.round(Math.random() * 60);
+
+            const actual = Math.min(mins + delayMin, 23 * 60 + 58);
+            addSeed(payload, dateStr, A.minutesToTime(actual), "Taken", s, scheduledTime, (actual - mins) * 60);
+            generated++;
+
+            // A hand breaking the IR beam twice for one dose. P2's dedup rule collapses these.
+            if (Math.random() < 0.05) {
+                const repeat = Math.min(actual + 3 + Math.round(Math.random() * 5), 23 * 60 + 59);
+                addSeed(payload, dateStr, A.minutesToTime(repeat), "Taken", s, scheduledTime, (repeat - mins) * 60);
+                generated++;
+            }
+        });
+    }
+
+    if (!generated) { showToast("Schedules produced no doses in that range.", true); return; }
+
+    db.ref(`history/${patientID}`).update(payload)
+        .then(() => showToast(`Seeded ${generated} simulated events across ${days} days.`))
+        .catch(err => showToast("Seeding failed: " + err.message, true));
+}
+
+function addSeed(payload, dateStr, timeStr, status, schedule, scheduledTime, delaySec) {
+    const key = `sim_${dateStr.replace(/-/g, '')}_${timeStr.replace(':', '')}_${Math.random().toString(36).slice(2, 7)}`;
+    payload[key] = {
+        date: dateStr,
+        time: timeStr,
+        status: status,
+        medName: schedule.medName || 'Unnamed',
+        compartment: Number(schedule.compartment) || 1,
+        scheduledTime: scheduledTime,
+        delaySec: delaySec,
+        epoch: Math.floor(new Date(`${dateStr}T${timeStr}:00`).getTime() / 1000),
+        simulated: true
+    };
+}
+
+// Removes only the records this tool created; real device events are left untouched.
+function clearSimulatedData() {
+    if (!patientID) { showToast("Select a patient first!", true); return; }
+    if (!confirm("Remove all simulated events for this patient? Real device events are kept.")) return;
+
+    db.ref(`history/${patientID}`).once('value').then(snap => {
+        const all = snap.val() || {};
+        const updates = {};
+        Object.keys(all).forEach(k => {
+            if (all[k] && all[k].simulated === true) updates[k] = null;
+        });
+        const count = Object.keys(updates).length;
+        if (!count) { showToast("No simulated events to clear."); return; }
+        return db.ref(`history/${patientID}`).update(updates)
+            .then(() => showToast(`Removed ${count} simulated events.`));
+    }).catch(err => showToast("Clear failed: " + err.message, true));
 }
 
 function simulateEvent(status) {
@@ -459,24 +653,19 @@ function simulateEvent(status) {
     db.ref(`patients/${patientID}/current_status`).set({
         state: status,
         last_updated: now.toISOString()
-    });
+    }).catch(err => reportDbError('update status', err));
 
-    // Update Analytics (transactional)
-    const analyticsRef = db.ref(`patients/${patientID}/analytics`);
-    analyticsRef.transaction(current => {
-        if (!current) current = { total_taken: 0, total_missed: 0 };
-        if (status === "Taken") current.total_taken++;
-        else current.total_missed++;
-        return current;
-    });
+    // No analytics counter write: Taken/Missed totals are derived from the log itself
+    // (see updateOverallSuccess), so a separate counter would only drift out of sync.
 
-    // Add History
+    // Add History. Tagged simulated so "Clear simulated data" can find it again.
     db.ref(`history/${patientID}/log_${timestamp}`).set({
         date: dateStr,
         time: timeStr,
         scheduled_time: "Simulation",
-        status: status
-    });
+        status: status,
+        simulated: true
+    }).catch(err => reportDbError('log simulated event', err));
     showToast(`Simulation sent: ${status}`);
 }
 

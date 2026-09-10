@@ -21,8 +21,8 @@ const int greenLed = 18, yellowLed = 19, redLed = 23;
 
 #define WIFI_SSID "Jaineel"
 #define WIFI_PASSWORD "12345678"
-#define API_KEY "AIzaSyDHfPrQkDvJm269HAxouiOcMl5HSIW8jME"
-#define DATABASE_URL "https://smartmedicine-68c37-default-rtdb.asia-southeast1.firebasedatabase.app" 
+#define API_KEY "AIzaSyDzGt90UApRGj30sj7tNqCAbsfZO2g6358"
+#define DATABASE_URL "https://smartmed-grp27-default-rtdb.asia-southeast1.firebasedatabase.app"
 #define USER_EMAIL "dr@example.com"
 #define USER_PASSWORD "password123"
 
@@ -99,6 +99,16 @@ int activeCompartment = -1;
 Schedule activeSchedule;
 int lastAlarmHour = -1;
 int lastAlarmMinute = -1;
+
+// A dose logged Missed at the alarm can still be taken late. Remember it per compartment
+// (index 1-3) so a later hand in that compartment logs "Taken" with its true delaySec --
+// otherwise every dose over 60 s late is a miss and timing adherence can never differ
+// from taking adherence.
+// ponytail: fixed 3 h late window, tune LATE_WINDOW_MS to the regimen
+const unsigned long LATE_WINDOW_MS = 3UL * 3600UL * 1000UL;
+Schedule lateSched[4];
+unsigned long lateSince[4] = {0, 0, 0, 0};
+bool latePending[4] = {false, false, false, false};
 
 // Prototypes
 void triggerHardwareTest();
@@ -399,6 +409,19 @@ void loop() {
   }
 
   if (currentState == IDLE) {
+    // Late doses: a hand in a compartment whose alarm already timed out
+    for (int c = 1; c <= 3; c++) {
+      if (!latePending[c]) continue;
+      bool crossedMidnight = curH * 60 + curM < lateSched[c].hour * 60 + lateSched[c].minute;
+      if (millis() - lateSince[c] > LATE_WINDOW_MS || crossedMidnight) { latePending[c] = false; continue; }
+      if (isHandDetected(c)) {
+        latePending[c] = false;
+        digitalWrite(greenLed, HIGH);
+        lcd.clear(); lcd.print("TAKEN (LATE)"); reportStatus("Taken", lateSched[c]);
+        delay(3000); digitalWrite(greenLed, LOW);
+      }
+    }
+
     // Check Alerts
     for (int i=0; i < activeScheduleCount; i++) {
       bool timeMatch = (schedules[i].hour == curH && schedules[i].minute == curM);
@@ -409,6 +432,8 @@ void loop() {
         lastAlarmHour = curH; lastAlarmMinute = curM; // Record trigger time
         activeCompartment = schedules[i].compartment;
         activeSchedule = schedules[i];
+        // A new dose from this compartment supersedes any older late one
+        if (activeCompartment >= 1 && activeCompartment <= 3) latePending[activeCompartment] = false;
         currentState = REMINDER_ACTIVE;
         monitoringStartTime = millis();
         lcd.clear(); lcd.print("DUE: "); lcd.print(schedules[i].medName);
@@ -445,6 +470,11 @@ void loop() {
     if (millis() - monitoringStartTime > MONITORING_DURATION) {
       digitalWrite(buzzerPin, LOW); digitalWrite(yellowLed, LOW); digitalWrite(redLed, HIGH);
       lcd.clear(); lcd.print("MISSED!"); reportStatus("Missed", activeSchedule);
+      if (activeCompartment >= 1 && activeCompartment <= 3) {
+        lateSched[activeCompartment] = activeSchedule;
+        lateSince[activeCompartment] = millis();
+        latePending[activeCompartment] = true;
+      }
       delay(3000); digitalWrite(redLed, LOW);
       currentState = IDLE; activeCompartment = -1;
     }

@@ -173,5 +173,25 @@ check('csv has a row per day', csv.split('\n').filter(function (l) {
   return /^2026-03-/.test(l);
 }).length, 7);
 
+// --- Live window: at 15:00 on 03-08 the 20:00 dose is not due yet, so it is not a miss
+var live = A.analyse(history, schedules, 7, {
+  today: '2026-03-08',
+  nonUseDates: { '2026-03-05': true },
+  nowMinutes: 15 * 60
+});
+check('live: P on 03-08 excludes the future 20:00 dose', live.rows[6].P, 2);
+check('live: 03-08 is a correct day so far', live.rows[6].correctDay, true);
+
+// --- Dedup must not merge two different slots that share a compartment
+var twoSlots = A.analyse({
+  a: ev('2026-03-08', '08:00', 'Taken', '08:00', 1),
+  b: ev('2026-03-08', '08:20', 'Taken', '08:20', 1)
+}, {
+  x: { medName: 'A', time: '08:00', compartment: 1, date: '2026-03-01', frequency: 'daily' },
+  y: { medName: 'B', time: '08:20', compartment: 1, date: '2026-03-01', frequency: 'daily' }
+}, 1, { today: '2026-03-08' });
+check('dedup: two slots 20 min apart in one compartment both count', twoSlots.rows[0].N, 2);
+check('dedup: nothing removed', twoSlots.summary.duplicatesRemoved, 0);
+
 console.log('\n' + (failures ? failures + ' FAILURE(S)' : 'All assertions passed.') + '\n');
 process.exit(failures ? 1 : 0);

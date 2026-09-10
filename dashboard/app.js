@@ -1,13 +1,13 @@
 // 1. FIREBASE CONFIGURATION
 const firebaseConfig = {
-  apiKey: "AIzaSyDHfPrQkDvJm269HAxouiOcMl5HSIW8jME",
-  authDomain: "smartmedicine-68c37.firebaseapp.com",
-  databaseURL: "https://smartmedicine-68c37-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "smartmedicine-68c37",
-  storageBucket: "smartmedicine-68c37.firebasestorage.app",
-  messagingSenderId: "480005818050",
-  appId: "1:480005818050:web:ac4d5716bdc0217a531d5b",
-  measurementId: "G-TPW3YY9QD4"
+  apiKey: "AIzaSyDzGt90UApRGj30sj7tNqCAbsfZO2g6358",
+  authDomain: "smartmed-grp27.firebaseapp.com",
+  databaseURL: "https://smartmed-grp27-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "smartmed-grp27",
+  storageBucket: "smartmed-grp27.firebasestorage.app",
+  messagingSenderId: "227295174203",
+  appId: "1:227295174203:web:de82ebc105dc1c89f6061e",
+  measurementId: "G-C6XHQM3V28"
 };
 
 // Initialize Firebase
@@ -406,7 +406,7 @@ function attachSchedulerListeners() {
 
         db.ref(`schedules/${patientID}`).push({
             medName, time, compartment,
-            date: new Date().toISOString().split('T')[0],
+            date: SmedAnalytics.dateKey(new Date()), // local date; toISOString() is UTC
             frequency: "daily",
             active: true
         }).then(() => {
@@ -548,7 +548,7 @@ function attachSimSuiteListeners() {
 function seedHistory() {
     if (!patientID) { showToast("Select a patient first!", true); return; }
 
-    const schedules = Object.values(currentSchedules || {});
+    const schedules = Object.entries(currentSchedules || {}).map(([key, s]) => ({ key, ...s }));
     if (!schedules.length) {
         showToast("Add at least one schedule before seeding history.", true);
         return;
@@ -560,6 +560,21 @@ function seedHistory() {
     let generated = 0;
 
     const today = new Date();
+    const nowMins = today.getHours() * 60 + today.getMinutes();
+    const startKey = A.dateKey(A.addDays(today, -(days - 1)));
+
+    // The analytics ignore days before a schedule's start date, so history seeded before a
+    // schedule created today would never be scored. Backdate daily schedules to the first
+    // seeded day, keeping the real start in seedOrigDate so "Clear simulated data" can put it back.
+    const startUpdates = {};
+    schedules.forEach(s => {
+        if (s.frequency === 'daily' && (!s.date || s.date > startKey)) {
+            startUpdates[`${s.key}/date`] = startKey;
+            if (!s.seedOrigDate) startUpdates[`${s.key}/seedOrigDate`] = s.date || A.dateKey(today);
+            s.date = startKey;
+        }
+    });
+
     for (let d = days - 1; d >= 0; d--) {
         const day = A.addDays(today, -d);
         const dateStr = A.dateKey(day);
@@ -568,6 +583,7 @@ function seedHistory() {
         schedules.forEach(s => {
             const mins = A.timeToMinutes(s.time);
             if (mins === null) return;
+            if (d === 0 && mins > nowMins) return; // not due yet today
             // "once" schedules only fire on their own date
             if (s.frequency !== 'daily' && s.date !== dateStr) return;
             if (s.frequency === 'daily' && s.date && dateStr < s.date) return;
@@ -605,7 +621,10 @@ function seedHistory() {
 
     if (!generated) { showToast("Schedules produced no doses in that range.", true); return; }
 
-    db.ref(`history/${patientID}`).update(payload)
+    Promise.all([
+        db.ref(`history/${patientID}`).update(payload),
+        db.ref(`schedules/${patientID}`).update(startUpdates)
+    ])
         .then(() => showToast(`Seeded ${generated} simulated events across ${days} days.`))
         .catch(err => showToast("Seeding failed: " + err.message, true));
 }
@@ -630,6 +649,18 @@ function clearSimulatedData() {
     if (!patientID) { showToast("Select a patient first!", true); return; }
     if (!confirm("Remove all simulated events for this patient? Real device events are kept.")) return;
 
+    // Undo the start-date backdating done by seedHistory
+    db.ref(`schedules/${patientID}`).once('value').then(snap => {
+        const updates = {};
+        Object.entries(snap.val() || {}).forEach(([k, s]) => {
+            if (s && s.seedOrigDate) {
+                updates[`${k}/date`] = s.seedOrigDate;
+                updates[`${k}/seedOrigDate`] = null;
+            }
+        });
+        if (Object.keys(updates).length) return db.ref(`schedules/${patientID}`).update(updates);
+    }).catch(err => reportDbError('restore schedule start dates', err));
+
     db.ref(`history/${patientID}`).once('value').then(snap => {
         const all = snap.val() || {};
         const updates = {};
@@ -646,7 +677,7 @@ function clearSimulatedData() {
 function simulateEvent(status) {
     const now = new Date();
     const timestamp = Math.floor(now.getTime() / 1000);
-    const dateStr = now.toISOString().split('T')[0];
+    const dateStr = SmedAnalytics.dateKey(now);
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
     // Update Status

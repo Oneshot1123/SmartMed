@@ -132,7 +132,10 @@
 
     events.forEach(function (ev) {
       if (!ev.taken) { kept.push(ev); return; }
-      var group = ev.dateKey + '|' + (ev.compartment || ev.medName || '*');
+      // Events that name their slot are only duplicates of the same slot: two schedules
+      // sharing a compartment 20 min apart are two real doses, not one beam broken twice.
+      var group = ev.dateKey + '|' + (ev.compartment || ev.medName || '*') +
+                  (ev.scheduledMinutes !== null ? '|' + ev.scheduledMinutes : '');
       var prev = lastByGroup[group];
       if (prev != null && ev.minutes - prev <= win) { removed++; return; }
       lastByGroup[group] = ev.minutes;
@@ -269,7 +272,7 @@
    * (hospitalisation, prescription held) are dropped from BOTH numerator and denominator,
    * so they do not count against the patient. This is distinct from non-adherence.
    */
-  function buildDailyTable(history, schedules, fromKey, toKey, nonUseDates) {
+  function buildDailyTable(history, schedules, fromKey, toKey, nonUseDates, nowMinutes) {
     var nonUse = nonUseDates || {};
     var events = dedupeActuations(normaliseHistory(history));
     var prescribed = expandPrescribed(schedules, fromKey, toKey);
@@ -283,14 +286,23 @@
       var slots = prescribed[key];
       var dayEvents = eventsByDate[key] || [];
       var matched = matchDay(slots, dayEvents);
+      var assignments = matched.assignments;
+
+      // Today's doses that are not due yet are neither taken nor missed. Keep one only if
+      // it was already taken early.
+      if (key === toKey && nowMinutes != null) {
+        assignments = assignments.filter(function (a) {
+          return a.event || a.slot.minutes <= nowMinutes;
+        });
+      }
 
       var N = 0, nOnTime = 0;
-      matched.assignments.forEach(function (a) {
+      assignments.forEach(function (a) {
         if (a.event) N++;
         if (a.onTime) nOnTime++;
       });
 
-      var P = slots.length;
+      var P = assignments.length;
       var excluded = nonUse[key] === true;
 
       return {
@@ -302,7 +314,7 @@
         extra: matched.extra.length,
         correctDay: P > 0 && N === P,
         excluded: excluded,
-        assignments: matched.assignments,
+        assignments: assignments,
         // Daily percentages, capped per P2 so an extra dose cannot push a day above 100%.
         takingPct: P > 0 ? pct(N, P) : null,
         timingPct: P > 0 ? pct(nOnTime, P) : null
@@ -471,7 +483,12 @@
     var start = addDays(end, -(windowDays - 1));
     var fromKey = dateKey(start), toKey = dateKey(end);
 
-    var rows = buildDailyTable(history, schedules, fromKey, toKey, opts.nonUseDates);
+    // Where "today" stops. Defaults to the clock for a live window; a fixed `today` (tests,
+    // historic reports) scores the whole day unless `nowMinutes` is given.
+    var nowMinutes = opts.nowMinutes != null ? opts.nowMinutes
+      : (opts.today ? null : end.getHours() * 60 + end.getMinutes());
+
+    var rows = buildDailyTable(history, schedules, fromKey, toKey, opts.nonUseDates, nowMinutes);
 
     return {
       window: { days: windowDays, from: fromKey, to: toKey },

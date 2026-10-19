@@ -451,7 +451,35 @@ function refreshAnalytics() {
     if (window.SmedAnalyticsUI) {
         window.SmedAnalyticsUI.render(currentHistory, currentSchedules);
     }
+    updateOverviewRisk();
     updateOverallSuccess();
+}
+
+// Compact version of the ML risk radar for the Overview header. Shows the single
+// next dose (including any dose due later today) rather than the top 5 list.
+function updateOverviewRisk() {
+    const chip = document.getElementById('next-risk-chip');
+    if (!chip) return;
+
+    if (!window.SmedRisk || !currentSchedules || !Object.keys(currentSchedules).length) {
+        chip.style.display = 'none';
+        return;
+    }
+
+    const result = window.SmedRisk.scoreUpcoming(currentHistory, currentSchedules, { daysAhead: 2 });
+    const next = result && result.upcoming && result.upcoming[0];
+    if (!next) {
+        chip.style.display = 'none';
+        return;
+    }
+
+    chip.style.display = 'inline-flex';
+    chip.className = 'risk-chip ' + next.level;
+    chip.textContent = 'Next dose ' + Math.round(next.probability * 100) + '% ' +
+        next.level.toUpperCase();
+    chip.title = next.reasons.length
+        ? next.reasons.map(r => r.label + ' ' + r.direction).join(' · ')
+        : 'No strong single factor';
 }
 
 function updateHistoryTable(historyData, containerId) {
@@ -525,12 +553,59 @@ function attachSimSuiteListeners() {
     const takenBtn = document.getElementById('sim-taken');
     const missedBtn = document.getElementById('sim-missed');
     const seedBtn = document.getElementById('seed-history');
+    const demoBtn = document.getElementById('create-demo-patient');
     const clearBtn = document.getElementById('clear-sim');
 
     if (takenBtn) takenBtn.onclick = () => simulateEvent("Taken");
     if (missedBtn) missedBtn.onclick = () => simulateEvent("Missed");
     if (seedBtn) seedBtn.onclick = () => seedHistory();
+    if (demoBtn) demoBtn.onclick = () => createDemoPatient();
     if (clearBtn) clearBtn.onclick = () => clearSimulatedData();
+}
+
+/*
+ * Builds a 60-day demo patient so the full dashboard can be checked end-to-end without
+ * touching a real participant. It is deliberately deterministic in structure (three
+ * schedules, weekend effect, evening drift) and uses a fixed ID, so clicking again
+ * refreshes the same patient instead of creating duplicates.
+ */
+function createDemoPatient() {
+    if (!caregiverUID) { showToast("Sign in before creating the demo patient.", true); return; }
+
+    const DEMO_ID = 'demo_patient_ml';
+    const DEMO_DAYS = 60;
+    const A = window.SmedAnalytics;
+    const now = new Date();
+    const startKey = A.dateKey(A.addDays(now, -(DEMO_DAYS - 1)));
+    const profile = {
+        name: 'Demo Patient',
+        age: '68',
+        condition: 'Hypertension',
+        notes: 'Demo patient with 60 days of simulated dose events for ML verification. Safe to remove.'
+    };
+    const schedules = {
+        demo_s1: { medName: 'Metformin', time: '08:00', compartment: 1, date: startKey, frequency: 'daily', active: true },
+        demo_s2: { medName: 'Amlodipine', time: '14:00', compartment: 2, date: startKey, frequency: 'daily', active: true },
+        demo_s3: { medName: 'Atorvastatin', time: '20:30', compartment: 3, date: startKey, frequency: 'daily', active: true }
+    };
+    const scheduleList = Object.entries(schedules).map(([key, s]) => ({ key, ...s }));
+    const seed = buildSeedPayload(scheduleList, DEMO_DAYS);
+
+    if (!seed.generated) {
+        showToast("Could not generate demo events for the current time.", true);
+        return;
+    }
+
+    Promise.all([
+        db.ref(`caregivers/${caregiverUID}/patients/${DEMO_ID}`).set(profile),
+        db.ref(`patients/${DEMO_ID}/profile`).set(profile),
+        db.ref(`patients/${DEMO_ID}/current_status`).set({ state: 'Waiting', last_updated: now.toISOString() }),
+        db.ref(`schedules/${DEMO_ID}`).set(schedules),
+        db.ref(`history/${DEMO_ID}`).set(seed.payload)
+    ]).then(() => {
+        showToast(`Demo patient ready: ${seed.generated} events across ${DEMO_DAYS} days.`);
+        switchPatient(DEMO_ID, profile.name);
+    }).catch(err => reportDbError('create demo patient', err));
 }
 
 /*
@@ -556,11 +631,7 @@ function seedHistory() {
 
     const days = Math.max(1, Math.min(180, parseInt(document.getElementById('seed-days').value, 10) || 60));
     const A = window.SmedAnalytics;
-    const payload = {};
-    let generated = 0;
-
     const today = new Date();
-    const nowMins = today.getHours() * 60 + today.getMinutes();
     const startKey = A.dateKey(A.addDays(today, -(days - 1)));
 
     // The analytics ignore days before a schedule's start date, so history seeded before a
@@ -574,6 +645,25 @@ function seedHistory() {
             s.date = startKey;
         }
     });
+
+    const seed = buildSeedPayload(schedules, days);
+    if (!seed.generated) { showToast("Schedules produced no doses in that range.", true); return; }
+
+    Promise.all([
+        db.ref(`history/${patientID}`).update(seed.payload),
+        db.ref(`schedules/${patientID}`).update(startUpdates)
+    ])
+        .then(() => showToast(`Seeded ${seed.generated} simulated events across ${days} days.`))
+        .catch(err => showToast("Seeding failed: " + err.message, true));
+}
+
+function buildSeedPayload(schedules, days) {
+    const A = window.SmedAnalytics;
+    const payload = {};
+    let generated = 0;
+
+    const today = new Date();
+    const nowMins = today.getHours() * 60 + today.getMinutes();
 
     for (let d = days - 1; d >= 0; d--) {
         const day = A.addDays(today, -d);
@@ -619,14 +709,7 @@ function seedHistory() {
         });
     }
 
-    if (!generated) { showToast("Schedules produced no doses in that range.", true); return; }
-
-    Promise.all([
-        db.ref(`history/${patientID}`).update(payload),
-        db.ref(`schedules/${patientID}`).update(startUpdates)
-    ])
-        .then(() => showToast(`Seeded ${generated} simulated events across ${days} days.`))
-        .catch(err => showToast("Seeding failed: " + err.message, true));
+    return { payload, generated };
 }
 
 function addSeed(payload, dateStr, timeStr, status, schedule, scheduledTime, delaySec) {

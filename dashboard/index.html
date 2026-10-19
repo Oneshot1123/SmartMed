@@ -106,7 +106,10 @@
                 <h3 style="font-family: 'Outfit'; margin-bottom: 0.5rem;">Adherence Velocity</h3>
                 <p style="color: var(--text-muted); font-size: 0.85rem;">Continuous live stream from Device ESP32-Rx</p>
               </div>
-              <div id="status-badge" class="status-badge waiting">Waiting</div>
+              <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+                <div id="next-risk-chip" class="risk-chip" style="display:none;">--</div>
+                <div id="status-badge" class="status-badge waiting">Waiting</div>
+              </div>
             </div>
             
             <div style="display: flex; gap: 3rem; align-items: center;">
@@ -344,6 +347,8 @@
               <div class="chart-legend" id="trend-legend">
                 <span><i class="swatch" style="background:#0e9f6e;"></i>Taking</span>
                 <span><i class="swatch" style="background:#c2410c;"></i>Timing</span>
+                <span><i class="swatch swatch-line" style="border-top-color:#0e9f6e;"></i>Taking forecast</span>
+                <span><i class="swatch swatch-line" style="border-top-color:#c2410c;"></i>Timing forecast</span>
                 <span><i class="swatch swatch-line"></i>80% threshold</span>
               </div>
             </div>
@@ -353,6 +358,28 @@
             <p class="empty-state" id="trend-empty" style="display:none;">
               No prescribed doses fall inside this window. Add a schedule, or widen the window.
             </p>
+          </div>
+
+          <!-- ML RISK RADAR -->
+          <div class="card span-3" id="ml-risk-card">
+            <div class="status-meta" style="align-items:flex-start;">
+              <div>
+                <h3 style="font-family:'Outfit'; margin-bottom:0.35rem;">
+                  AI risk radar <span class="ml-badge">ML</span>
+                </h3>
+                <p style="color:var(--text-muted); font-size:0.85rem;">
+                  A logistic model scores every scheduled dose in the next 7 days from
+                  adherence history, dose slot, weekday and timing drift.
+                </p>
+              </div>
+              <div class="risk-summary" id="risk-summary"></div>
+            </div>
+            <p class="risk-headline" id="risk-headline"></p>
+            <div class="risk-list" id="risk-list"></div>
+            <p class="empty-state" id="risk-empty" style="display:none;">
+              No upcoming doses in the next 7 days. Deploy a regimen in the Scheduler to see risk scores.
+            </p>
+            <p class="ml-footnote" id="risk-model-note"></p>
           </div>
 
           <!-- HEATMAP -->
@@ -412,6 +439,16 @@
                 </div>
 
                 <div style="margin-top:1.75rem; padding-top:1.5rem; border-top:1px solid var(--surface-border);">
+                    <h4 style="font-size:0.9rem; margin-bottom:0.4rem;">Demo patient</h4>
+                    <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom:1rem;">
+                        Creates or refreshes a demo patient with three daily medicines and
+                        60 days of recent dose events, so the ML risk card has data to score.
+                        Records are tagged <code>simulated</code>.
+                    </p>
+                    <button class="btn-pill btn-pill-primary" id="create-demo-patient" style="font-size:0.7rem; width:100%;">CREATE / REFRESH DEMO PATIENT</button>
+                </div>
+
+                <div style="margin-top:1.75rem; padding-top:1.5rem; border-top:1px solid var(--surface-border);">
                     <h4 style="font-size:0.9rem; margin-bottom:0.4rem;">Seed history</h4>
                     <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom:1rem;">
                         Generates dose events against this patient's actual schedules so the
@@ -443,6 +480,8 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
   <!-- Pure computation, then the rendering layer that consumes it -->
   <script src="analytics.js"></script>
+  <script src="ml-model.js"></script>
+  <script src="ml-risk.js"></script>
   <script src="analytics-ui.js"></script>
   <script src="app.js"></script>
 </body>

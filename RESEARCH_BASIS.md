@@ -155,6 +155,99 @@ hour-of-day × weekday miss heatmap is designed to surface.
 
 ---
 
+## ML layer *(implemented — the risk radar and 7-day forecast)*
+
+The analytics above describe what happened. The ML layer predicts what is likely to happen at
+the **next scheduled dose**, using only history that would have been available before that
+dose. It is deliberately a small, auditable model: the feature weights are frozen at training
+time and shipped as static JavaScript, so the browser needs no server and the demo has no
+network dependency beyond Firebase.
+
+### P5 — Per-dose adherence prediction from event history
+
+> Gu Y, Zalkikar A, Liu M, Kelly L, Hall A, Daly K, Ward T. **Predicting medication adherence
+> using ensemble learning and deep learning models with large scale healthcare data.**
+> *Scientific Reports.* 2021;11:18961.
+> doi:[10.1038/s41598-021-98387-w](https://doi.org/10.1038/s41598-021-98387-w)
+> · PMID 34556746 · PMCID PMC8460813
+
+The closest published analogue to SmartMed's ML layer. It predicts whether the **next
+scheduled self-injection** will be on time, from the history of an IoT-connected sharps bin
+(342,174 events from ~8,000 units). Key findings that shaped this implementation:
+
+1. **History dominates.** Prior drop events accounted for 94% of feature importance; six
+   prior events gave the best trade-off. Our model uses 7/14/30-day adherence windows, a
+   miss streak, this slot's miss rate, this weekday's miss rate, and the previous outcome.
+2. **Per-dose prediction is useful.** A per-event probability lets a caregiver prioritise the
+   upcoming dose rather than label the patient globally. SmartMed's risk radar follows this
+   framing.
+3. **Tree ensembles and LSTMs are strong.** Their LSTM reached AUC 0.839 on future test data.
+   We benchmark random forest and gradient boosting in `ml/train_risk.py`, but ship logistic
+   regression because it is interpretable and stable on the much smaller real pilot.
+4. **Always use a future/temporal split.** Their deployment test is a later time period, not a
+   random split. Ours is a temporal holdout by date, with an optional leave-one-patient-out
+   check (`--loso`).
+
+**Difference in scale and claim.** Their AUC 0.839 comes from hundreds of thousands of real
+events with long per-patient histories. SmartMed's current holdout is 14,400 synthetic rows
+from 40 simulated patients and reaches AUC ≈0.68; the real pilot is for calibration, not for
+claiming external validity. The model card states this explicitly.
+
+### P6 — Damped exponential smoothing for the 7-day forecast
+
+> Hyndman RJ, Athanasopoulos G. **Forecasting: Principles and Practice.** 3rd ed. Melbourne:
+> OTexts; 2021. [OTexts.com/fpp3](https://otexts.com/fpp3/)
+
+Damped Holt linear-trend exponential smoothing is used for the 7-day taking/timing forecast
+(level + damped trend, no seasonality). The implementation follows the standard component
+form:
+
+```
+level_t = α y_t + (1 − α)(level_{t−1} + φ trend_{t−1})
+trend_t = β(level_t − level_{t−1}) + (1 − β) φ trend_{t−1}
+forecast_h = level_T + (φ + φ² + … + φ^h) trend_T
+```
+
+The smoothing parameters are selected on the training series and evaluated with a
+**rolling-origin backtest** (four 7-day folds) against naive persistence. On the stable pooled
+synthetic series the forecast is approximately as accurate as naive persistence, which is the
+honest expected result when behaviour is noisy; the value of the forecast is that it smooths
+day-to-day noise and shows direction, not that it can predict a coin flip.
+
+### P7 — Probability calibration under class weighting
+
+> Saerens M, Latinne P, Decaestecker C. **Adjusting the outputs of a classifier to new a priori
+> probabilities: a simple procedure.** *Neural Computation.* 2002;14(1):21–41.
+> doi:[10.1162/089976602753284446](https://doi.org/10.1162/089976602753284446)
+
+`class_weight="balanced"` improves learning when non-adherence is the minority class, but it
+deliberately shifts the output probabilities away from the observed base rate. The training
+script therefore corrects the intercept to the observed non-adherence rate on the holdout
+(simulated first, then real pilot rows once at least 20 are available). This is prior correction, not full
+Platt scaling; it keeps the ranking unchanged while making "60%" mean roughly "60 out of 100
+comparable doses", which matters for the High/Medium/Low thresholds.
+
+### ML implementation map
+
+| Component | Choice | Anchor |
+|---|---|---|
+| Target | missed OR >60 min late | P2, P4, P5 |
+| Feature set | 17 history/calendar features, strictly pre-dose | P5 |
+| Production model | L2 logistic regression | P5 (logistic is a top performer in small samples) |
+| Benchmarks | random forest, gradient boosting | P5 |
+| Validation | temporal split by date (last 20% of days); optional LOSO | P5 |
+| Probability correction | intercept prior correction | P7 |
+| Data freshness guard | pause scoring after 3 days without events while doses were due | operational safety rule |
+| 7-day forecast | damped Holt; rolling-origin backtest | P6 |
+| Leakage guard | target-day events excluded; parity test Python↔JS | P5 |
+
+**Not implemented, and why:** LSTM/sequence models need more real history than the pilot can
+provide; TinyML/on-device inference adds embedded risk for no demo benefit; causal or
+counterfactual adherence modelling is outside the scope of a 4-day build. These are scope
+choices, not oversights.
+
+---
+
 ## Metric implementation map
 
 | Metric | Formula | Anchor | Implemented |
@@ -169,6 +262,9 @@ hour-of-day × weekday miss heatmap is designed to surface.
 | Drug-holiday / gap detection | runs of consecutive days with no dose | P3, Burnier 2018 | No |
 | Within-patient variability | monthly SD of daily adherence | P4 | No |
 | Initiation / persistence | time-to-first-dose, days-since-last-dose | P1 | No |
+| Next-dose risk | logistic probability from 17 pre-dose features | P5, P7 | Yes |
+| 7-day adherence forecast | damped Holt on the daily series | P6 | Yes |
+| Feature parity | Python training features = JS inference features | P5 | Yes |
 
 Metrics marked "No" are documented deliberately: they are the surveyed literature this
 implementation does *not* yet cover, and each has a defined path to implementation off

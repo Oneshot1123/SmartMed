@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SmartMed | The Goat Dashboard</title>
+  <title>SmartMed | Caregiver</title>
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -13,25 +13,25 @@
   <div class="bg-blob blob-2"></div>
 
   <!-- AUTHENTICATION VIEW -->
-  <div id="auth-view" class="view active" style="display: flex; align-items:center; justify-content:center; height:100vh;">
-    <div class="card" style="width: 400px; text-align: center; border: 1px solid var(--emerald-glow);">
-      <div class="brand-icon" style="margin: 0 auto 1.5rem;">
+  <div id="auth-view" class="view active auth-view">
+    <div class="card auth-card">
+      <div class="brand-icon auth-brand-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3">
           <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
         </svg>
       </div>
-      <h2 style="font-family: 'Outfit'; font-size: 1.75rem; margin-bottom: 0.5rem;">Caregiver Secure</h2>
-      <p style="color: var(--text-muted); margin-bottom: 2rem;">Authenticating Clinical Access</p>
-      
+      <h2 class="auth-title">SmartMed</h2>
+      <p class="auth-subtitle">Sign in to see medicines and box updates.</p>
+
       <form id="login-form">
-        <input type="email" id="email" required placeholder="Medical ID / Email" 
-               style="width: 100%; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 12px; color: white; margin-bottom: 12px;">
-        <input type="password" id="password" required placeholder="Access Token" 
-               style="width: 100%; padding: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--surface-border); border-radius: 12px; color: white; margin-bottom: 20px;">
-        <button type="submit" id="auth-btn" class="btn-pill btn-pill-primary" style="width: 100%; padding: 16px;">Initiate Session</button>
-        <p id="auth-error" style="color: var(--rose-alert); font-size: 0.85rem; margin-top: 15px; display: none;"></p>
-        <p style="margin-top: 15px; font-size: 0.9rem; color: var(--text-muted);">
-            Don't have an account? <a href="#" id="toggle-signup" style="color: var(--cyan-data); text-decoration: none;">Sign Up</a>
+        <label class="vital-label auth-label" for="email">Email</label>
+        <input type="email" id="email" class="auth-input" required autocomplete="email" placeholder="you@example.com">
+        <label class="vital-label auth-label" for="password">Password</label>
+        <input type="password" id="password" class="auth-input" required autocomplete="current-password" placeholder="Your password">
+        <button type="submit" id="auth-btn" class="btn-pill btn-pill-primary auth-submit">Sign in</button>
+        <p id="auth-error" class="auth-error" style="display: none;"></p>
+        <p class="auth-switch">
+          Don't have an account? <a href="#" id="toggle-signup">Create one</a>
         </p>
       </form>
     </div>
@@ -47,343 +47,322 @@
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
           </div>
-          <h2 style="font-family: 'Outfit';">SmartMed</h2>
+          <h2>SmartMed</h2>
         </div>
-        
-        <nav class="nav-links">
-          <a href="#" class="nav-item active" id="nav-overview">
+
+        <nav class="nav-links" aria-label="Main navigation">
+          <a href="#" class="nav-item active" id="nav-overview" aria-current="page">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            Overview
-          </a>
-          <a href="#" class="nav-item" id="nav-patients">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><circle cx="19" cy="11" r="2"/></svg>
-            Patients
+            Today
           </a>
           <a href="#" class="nav-item" id="nav-scheduler">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Scheduler
+            Medicines
           </a>
           <a href="#" class="nav-item" id="nav-history">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            Clinical Log
+            History
           </a>
-          <a href="#" class="nav-item" id="nav-analytics">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-            Analytics
-          </a>
-          <a href="#" class="nav-item" id="nav-settings">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Settings
+          <a href="#" class="nav-item" id="nav-more">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+            More
           </a>
         </nav>
       </div>
-      
-      <button id="logout-btn" class="nav-item" style="border:none; cursor:pointer; width:100%; text-align:left;">
+
+      <button id="logout-btn" class="nav-item nav-logout" type="button">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        Sign Out
+        Sign out
       </button>
     </aside>
 
     <main id="main-content">
-      <!-- DASHBOARD SECTION -->
+      <!-- TODAY -->
       <section id="section-overview" class="content-section active animate-fade-up">
-        <header>
+        <header class="page-header">
           <div class="header-title">
-            <h1>Patient Insight</h1>
-            <p id="patient-subtitle">Currently monitoring adherence for John Doe</p>
+            <h1>Today</h1>
+            <p id="patient-subtitle">Medicines and box status at a glance.</p>
           </div>
-          <div class="profile-chip">
-            <div class="avatar">JD</div>
-            <span id="patient-name-top">John Doe</span>
+          <div class="patient-switch">
+            <label for="patient-select" class="vital-label">Person you care for</label>
+            <select id="patient-select" aria-label="Person you care for" disabled>
+              <option>No person added yet</option>
+            </select>
           </div>
         </header>
 
-        <div class="grid" style="margin-top: 1rem;">
-          <!-- Status Column -->
+        <div class="grid today-grid">
           <div class="card span-2">
-            <div class="status-meta">
+            <div class="section-head">
               <div>
-                <h3 style="font-family: 'Outfit'; margin-bottom: 0.5rem;">Adherence Velocity</h3>
-                <p style="color: var(--text-muted); font-size: 0.85rem;">Continuous live stream from Device ESP32-Rx</p>
+                <h2 class="card-title">Next dose</h2>
+                <p class="muted">The next medicine due from the box today.</p>
               </div>
-              <div id="status-badge" class="status-badge waiting">Waiting</div>
+              <span id="box-status" class="box-status checking">Checking box...</span>
             </div>
-            
-            <div style="display: flex; gap: 3rem; align-items: center;">
-              <div class="vital-stat">
-                <span class="vital-label">Last Activity</span>
-                <span id="last-updated-time" class="vital-value" style="font-size: 2rem;">--:--</span>
+
+            <div class="next-dose-block">
+              <div id="next-dose-time" class="next-dose-time">--:--</div>
+              <div id="next-dose-med" class="next-dose-med">No medicine scheduled</div>
+              <p id="next-dose-note" class="muted small"></p>
+            </div>
+
+            <div class="today-counts">
+              <div>
+                <span class="vital-label">Taken today</span>
+                <strong id="today-taken">0</strong>
               </div>
-              <div class="vital-stat" style="border-left: 1px solid var(--surface-border); padding-left: 3rem;">
-                <span class="vital-label">Next Dose</span>
-                <span id="next-dose-time" class="vital-value" style="font-size: 2rem; color: var(--amber-caution);">08:00</span>
+              <div>
+                <span class="vital-label">No record</span>
+                <strong id="today-missed">0</strong>
               </div>
+              <div>
+                <span class="vital-label">Later today</span>
+                <strong id="today-later">0</strong>
+              </div>
+            </div>
+
+            <div id="today-doses" class="today-doses"></div>
+            <p class="sync-line">Box last updated <span id="last-updated-time">--</span></p>
+          </div>
+
+          <div class="card week-card">
+            <h2 class="card-title">This week</h2>
+            <div id="week-taking" class="week-value">--</div>
+            <p id="week-caption" class="muted">No doses recorded yet.</p>
+            <div class="week-bar" aria-hidden="true"><i id="week-fill"></i></div>
+            <p id="week-numbers" class="week-numbers"></p>
+          </div>
+
+          <!-- ML RISK CARD -->
+          <div class="card span-3" id="ml-risk-card">
+            <div class="section-head">
+              <div>
+                <h2 class="card-title">What to watch</h2>
+                <p class="muted">A heads-up about the next 7 days, based on the last 30 days of doses. This is not a diagnosis.</p>
+              </div>
+            </div>
+            <p class="risk-headline" id="risk-headline" aria-live="polite"></p>
+            <div class="risk-list" id="risk-list" aria-live="polite"></div>
+            <p class="empty-state" id="risk-empty" style="display:none;">
+              No doses scheduled yet. Add the first medicine to start.
+            </p>
+            <details class="risk-about">
+              <summary>How this is calculated</summary>
+              <p class="ml-footnote" id="risk-model-note"></p>
+            </details>
+            <div class="explain-block">
+              <button id="explain-btn" class="btn-pill btn-pill-secondary" type="button">Explain in simple words</button>
+              <p id="explain-out" class="explain-out" style="display:none;" aria-live="polite"></p>
+              <p class="explain-disclaimer" id="explain-disclaimer" style="display:none;">AI summary — double-check it against the numbers shown above.</p>
             </div>
           </div>
 
-          <!-- Quick Stats -->
-          <div class="card">
-            <h3 style="font-family: 'Outfit'; margin-bottom: 1.5rem;">Overall Success</h3>
-            <div class="chart-container" style="height: 120px;">
-              <canvas id="adherenceChart"></canvas>
+          <div class="card span-3 recent-card">
+            <div class="section-head">
+              <h2 class="card-title">Recent doses</h2>
+              <a href="#" class="text-link" data-goto="section-history" data-nav="nav-history">See all</a>
             </div>
-            <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                <div>
-                    <span class="vital-label">TAKEN</span>
-                    <span id="stat-taken" style="font-weight: 800; color: var(--emerald-heal);">0</span>
-                </div>
-                <div>
-                    <span class="vital-label">MISSED</span>
-                    <span id="stat-missed" style="font-weight: 800; color: var(--rose-alert);">0</span>
-                </div>
-            </div>
-          </div>
-
-          <!-- History Snippet -->
-          <div class="card span-2" style="padding: 1.25rem;">
-            <h3 style="font-family: 'Outfit'; margin-bottom: 1rem; font-size: 1.1rem;">Recent Clinical Logs</h3>
             <div class="table-container">
               <table>
                 <thead>
                   <tr>
-                    <th>TIMESTAMP</th>
-                    <th>EVENT</th>
-                    <th>COMPARTMENT</th>
+                    <th>TIME</th>
+                    <th>MEDICINE</th>
+                    <th>RESULT</th>
                   </tr>
                 </thead>
                 <tbody id="history-body">
-                  <!-- JS Injection -->
+                  <!-- JS injection -->
                 </tbody>
               </table>
             </div>
           </div>
-
-          <!-- Inventory (New Feature) -->
-          <div class="card">
-            <h3 style="font-family: 'Outfit'; margin-bottom: 1rem;">Pill Inventory</h3>
-            <div class="inventory-bar-container">
-                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
-                    <span>Compartment 1</span>
-                    <span id="inv-count">14 Pills</span>
-                </div>
-                <div style="height:8px; background:var(--surface-border); border-radius:10px; overflow:hidden;">
-                    <div id="inv-fill" style="width:100%; height:100%; background:var(--cyan-data);"></div>
-                </div>
-                <p id="refill-prediction" style="font-size:0.75rem; color:var(--text-muted); margin-top:10px;">Refill expected in 14 days.</p>
-            </div>
-          </div>
         </div>
       </section>
 
-      <!-- PATIENTS SECTION -->
+      <!-- PEOPLE -->
       <section id="section-patients" class="content-section animate-fade-up" style="display:none;">
-        <header style="display:flex; justify-content:space-between; align-items:center;">
-            <h1>Clinical Patient Matrix</h1>
-            <button id="add-patient-btn" class="btn-pill btn-pill-primary" style="padding: 10px 20px;">+ Add Patient</button>
+        <header class="page-header">
+          <div class="header-title">
+            <h1>People</h1>
+            <p>Add or switch the person you care for.</p>
+          </div>
+          <button id="add-patient-btn" class="btn-pill btn-pill-primary" type="button">+ Add person</button>
         </header>
 
-        <!-- Add Patient Form (Hidden by default) -->
-        <div id="add-patient-form-container" class="card" style="display:none; margin-top: 2rem; border: 1px solid var(--cyan-data);">
-            <h3 style="margin-bottom: 1rem;">Register New Patient</h3>
-            <form id="new-patient-form" style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-                <div class="input-group">
-                    <label class="vital-label">FULL NAME</label>
-                    <input type="text" id="new-p-name" required placeholder="e.g. Jane Smith" style="width:100%; padding:10px; background:var(--bg-primary); border:1px solid var(--surface-border); border-radius:8px; color:white;">
-                </div>
-                <div class="input-group">
-                    <label class="vital-label">AGE</label>
-                    <input type="number" id="new-p-age" required placeholder="e.g. 50" style="width:100%; padding:10px; background:var(--bg-primary); border:1px solid var(--surface-border); border-radius:8px; color:white;">
-                </div>
-                <div class="input-group span-2">
-                    <label class="vital-label">PRIMARY CONDITION</label>
-                    <input type="text" id="new-p-condition" required placeholder="e.g. Type 2 Diabetes" style="width:100%; padding:10px; background:var(--bg-primary); border:1px solid var(--surface-border); border-radius:8px; color:white;">
-                </div>
-                <div class="input-group span-2">
-                    <label class="vital-label">CLINICAL NOTES</label>
-                    <textarea id="new-p-notes" required placeholder="Any specific requirements..." style="width:100%; padding:10px; background:var(--bg-primary); border:1px solid var(--surface-border); border-radius:8px; color:white; height: 80px;"></textarea>
-                </div>
-                <div style="grid-column: span 2; display:flex; gap:1rem; justify-content:flex-end; margin-top: 1rem;">
-                    <button type="button" id="cancel-add-patient" class="btn-pill btn-pill-secondary">Cancel</button>
-                    <button type="submit" class="btn-pill btn-pill-primary">Create Patient Record</button>
-                </div>
-            </form>
+        <div id="add-patient-form-container" class="card add-form-card" style="display:none;">
+          <h2 class="card-title">New person</h2>
+          <form id="new-patient-form" class="form-grid">
+            <div class="input-group">
+              <label class="vital-label" for="new-p-name">Name</label>
+              <input type="text" id="new-p-name" required placeholder="e.g. Jane Smith" autocomplete="name">
+            </div>
+            <div class="input-group">
+              <label class="vital-label" for="new-p-age">Age</label>
+              <input type="number" id="new-p-age" required placeholder="e.g. 50" min="1" max="120">
+            </div>
+            <div class="input-group span-2">
+              <label class="vital-label" for="new-p-condition">Condition</label>
+              <input type="text" id="new-p-condition" required placeholder="e.g. Type 2 diabetes">
+            </div>
+            <div class="input-group span-2">
+              <label class="vital-label" for="new-p-notes">Notes</label>
+              <textarea id="new-p-notes" required placeholder="Anything the caregiver should know" rows="3"></textarea>
+            </div>
+            <div class="form-actions span-2">
+              <button type="button" id="cancel-add-patient" class="btn-pill btn-pill-secondary">Cancel</button>
+              <button type="submit" class="btn-pill btn-pill-primary">Add person</button>
+            </div>
+          </form>
         </div>
 
-        <div class="grid" id="patients-grid" style="margin-top:2rem;">
-            <!-- Patient cards will be injected here via JS -->
-            <!-- Profile Card -->
-            <div class="card span-2">
-                <div style="display:flex; gap:2rem;">
-                    <div style="width:120px; height:120px; background:var(--surface-hover); border-radius:30px; display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:800; color:var(--emerald-heal); border:1px solid var(--surface-border);">
-                        JD
-                    </div>
-                    <div style="flex:1;">
-                        <h2 id="p-name" style="font-family:'Outfit'; font-size:2rem; margin-bottom:0.5rem;">John Doe</h2>
-                        <div style="display:flex; gap:1.5rem; flex-wrap:wrap;">
-                            <div><span class="vital-label">AGE</span><span id="p-age" style="font-weight:700;">65 Years</span></div>
-                            <div><span class="vital-label">CONDITION</span><span id="p-condition" style="font-weight:700;">Hypertension</span></div>
-                            <div><span class="vital-label">ID</span><span style="font-weight:700; color:var(--text-muted);">#SM-8492</span></div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div style="margin-top:2rem; padding:1.5rem; background:rgba(255,255,255,0.02); border-radius:16px; border:1px solid var(--surface-border);">
-                    <h4 style="font-size:0.8rem; letter-spacing:1px; color:var(--text-muted); margin-bottom:10px;">CLINICAL NOTES</h4>
-                    <p id="p-notes" style="font-size:0.95rem;">Patient requires strict adherence to morning and evening doses. Monitor for dizziness during afternoon period.</p>
-                </div>
-            </div>
-
-            </div>
+        <div class="grid patients-grid" id="patients-grid">
+          <!-- Patient cards injected by app.js -->
+        </div>
       </section>
 
-      <!-- SCHEDULER SECTION -->
+      <!-- MEDICINES -->
       <section id="section-scheduler" class="content-section animate-fade-up" style="display:none;">
-        <header><h1>Medication Scheduler</h1></header>
-        <div class="grid" style="margin-top:2rem;">
-            <div class="card span-2">
-                <h3>Deploy New Regimen</h3>
-                <form id="schedule-form" style="margin-top:1.5rem; display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-                    <div class="input-group">
-                        <label class="vital-label">MEDICINE NAME</label>
-                        <input type="text" id="sched-med" required placeholder="e.g. Aspirin" style="width:100%; padding:12px; background:var(--bg-primary); border:1px solid var(--surface-border); border-radius:10px; color:white;">
-                    </div>
-                    <div class="input-group">
-                        <label class="vital-label">TIME (HH:MM)</label>
-                        <input type="time" id="sched-time" required style="width:100%; padding:12px; background:var(--bg-primary); border:1px solid var(--surface-border); border-radius:10px; color:white;">
-                    </div>
-                    <div class="input-group">
-                        <label class="vital-label">COMPARTMENT</label>
-                        <select id="sched-comp" style="width:100%; padding:12px; background:var(--bg-primary); border:1px solid var(--surface-border); border-radius:10px; color:white;">
-                            <option value="1">Compartment 1</option>
-                            <option value="2">Compartment 2</option>
-                            <option value="3">Compartment 3</option>
-                        </select>
-                    </div>
-                    <div style="display:flex; align-items:flex-end;">
-                        <button type="submit" class="btn-pill btn-pill-primary" style="width:100%;">Add to Device</button>
-                    </div>
-                </form>
-            </div>
-            
-            <div class="card">
-                <h3>Active Regimens</h3>
-                <div id="active-schedules-list" style="margin-top:1rem; display:flex; flex-direction:column; gap:10px;">
-                    <!-- JS Injection -->
-                </div>
-            </div>
-        </div>
-      </section>
-
-      <!-- HISTORY SECTION -->
-      <section id="section-history" class="content-section animate-fade-up" style="display:none;">
-        <header><h1>Longitudinal Log</h1></header>
-        <div class="card" style="margin-top:2rem;">
-            <div class="table-container">
-              <table id="full-history-table">
-                <thead>
-                  <tr>
-                    <th>DATE</th>
-                    <th>TIME</th>
-                    <th>STATUS</th>
-                    <th>DETAIL</th>
-                  </tr>
-                </thead>
-                <tbody id="full-history-body"></tbody>
-              </table>
-            </div>
-        </div>
-      </section>
-
-      <!-- ANALYTICS SECTION -->
-      <section id="section-analytics" class="content-section animate-fade-up" style="display:none;">
-        <header style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+        <header class="page-header">
           <div class="header-title">
-            <h1>Adherence Analytics</h1>
-            <p id="analytics-subtitle">Implementation-phase adherence, computed per the EAMD framework</p>
+            <h1>Medicines</h1>
+            <p>Add each medicine, its time, and its box slot.</p>
           </div>
-          <div style="display:flex; gap:0.75rem; align-items:center;">
+        </header>
+
+        <div class="grid">
+          <div class="card span-2">
+            <h2 class="card-title">Add a medicine</h2>
+            <form id="schedule-form" class="form-grid">
+              <div class="input-group">
+                <label class="vital-label" for="sched-med">Medicine name</label>
+                <input type="text" id="sched-med" required placeholder="e.g. Aspirin">
+              </div>
+              <div class="input-group">
+                <label class="vital-label" for="sched-time">Time</label>
+                <input type="time" id="sched-time" required>
+              </div>
+              <div class="input-group">
+                <label class="vital-label" for="sched-comp">Box slot</label>
+                <select id="sched-comp">
+                  <option value="1">Slot 1</option>
+                  <option value="2">Slot 2</option>
+                  <option value="3">Slot 3</option>
+                </select>
+              </div>
+              <div class="form-actions form-actions-end">
+                <button type="submit" class="btn-pill btn-pill-primary">Add medicine</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title">Current medicines</h2>
+            <div id="active-schedules-list" class="schedule-list">
+              <!-- JS injection -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HISTORY -->
+      <section id="section-history" class="content-section animate-fade-up" style="display:none;">
+        <header class="page-header">
+          <div class="header-title">
+            <h1>History</h1>
+            <p>Tap a day to see which medicines were taken or missed.</p>
+          </div>
+        </header>
+        <div id="history-accordion" class="history-accordion">
+          <!-- JS injection: day -> morning/afternoon/night -> medicine -->
+        </div>
+      </section>
+
+      <!-- REPORTS -->
+      <section id="section-analytics" class="content-section animate-fade-up" style="display:none;">
+        <header class="page-header">
+          <div class="header-title">
+            <h1>Reports</h1>
+            <p id="analytics-subtitle">Weekly dose patterns and the evidence behind them.</p>
+          </div>
+          <div class="report-actions">
             <div class="window-switch" id="window-switch" role="group" aria-label="Observation window">
               <button type="button" data-days="7">7d</button>
               <button type="button" data-days="30" class="active">30d</button>
               <button type="button" data-days="90">90d</button>
             </div>
-            <button id="export-csv-btn" class="btn-pill btn-pill-secondary" style="padding:10px 18px; font-size:0.8rem;">Export CSV</button>
+            <button id="export-csv-btn" class="btn-pill btn-pill-secondary btn-small" type="button">Export CSV</button>
           </div>
         </header>
 
-        <!-- KPI TILES -->
-        <div class="grid" style="margin-top:1.5rem;">
-          <div class="card metric-tile" style="grid-column: span 1;">
-            <span class="vital-label">Taking adherence</span>
+        <div class="grid report-grid">
+          <div class="card metric-tile">
+            <span class="vital-label">Doses taken <button class="info-icon" type="button" tabindex="0" data-tip="Of all doses scheduled this period, the share where the box recorded the medicine. Calculated per day, then averaged — never pooled." aria-label="How 'Doses taken' is calculated">i</button></span>
             <div class="metric-value" id="metric-taking">--</div>
             <div class="metric-sub" id="metric-taking-sub">No data</div>
             <p class="metric-note">Doses taken &divide; doses prescribed</p>
           </div>
-          <div class="card metric-tile" style="grid-column: span 1;">
-            <span class="vital-label">Timing adherence</span>
+          <div class="card metric-tile">
+            <span class="vital-label">Taken on time <button class="info-icon" type="button" tabindex="0" data-tip="Of the doses taken, the share opened within one hour of the set time. Slow timing alone is shown here so it cannot be hidden by skipping doses." aria-label="How 'Taken on time' is calculated">i</button></span>
             <div class="metric-value" id="metric-timing">--</div>
             <div class="metric-sub" id="metric-timing-sub">No data</div>
-            <p class="metric-note">Taken within &plusmn;60 min of the scheduled time</p>
+            <p class="metric-note">Within 60 minutes of the scheduled time</p>
           </div>
-          <div class="card metric-tile" style="grid-column: span 1;">
-            <span class="vital-label">Correct-dosing days</span>
+          <div class="card metric-tile">
+            <span class="vital-label">Days with all doses <button class="info-icon" type="button" tabindex="0" data-tip="On how many days every single scheduled dose was taken. Likely missed doses are excluded first, so it is not punished for doses never recorded." aria-label="How 'Days with all doses' is calculated">i</button></span>
             <div class="metric-value" id="metric-correct">--</div>
             <div class="metric-sub" id="metric-correct-sub">No data</div>
-            <p class="metric-note">Days with the exact prescribed dose count</p>
+            <p class="metric-note">Days where every scheduled dose was taken</p>
           </div>
 
-          <!-- DAILY TREND -->
           <div class="card span-3">
-            <div class="status-meta" style="align-items:flex-start;">
+            <div class="section-head">
               <div>
-                <h3 style="font-family:'Outfit'; margin-bottom:0.35rem;">Daily adherence</h3>
-                <p style="color:var(--text-muted); font-size:0.85rem;" id="trend-caption">
-                  Each point is one day. The gap between the two lines is time-of-day drift.
-                </p>
+                <h2 class="card-title">Daily doses <button class="info-icon" type="button" tabindex="0" data-tip="Each point is one day. The dashed line at the end is what the last 30 days project for the next 7 days — an estimate, not recorded data." aria-label="About the daily dose chart and dashed projection">i</button></h2>
+                <p class="muted" id="trend-caption">Each point is one day. The dashed line is an estimate, not recorded data.</p>
               </div>
               <div class="chart-legend" id="trend-legend">
-                <span><i class="swatch" style="background:#0e9f6e;"></i>Taking</span>
-                <span><i class="swatch" style="background:#c2410c;"></i>Timing</span>
-                <span><i class="swatch swatch-line"></i>80% threshold</span>
+                <span><i class="swatch" style="background:#0e9f6e;"></i>Doses taken</span>
+                <span><i class="swatch" style="background:#c2410c;"></i>On time</span>
+                <span><i class="swatch swatch-line" style="border-top-color:#0e9f6e;"></i>Expected</span>
+                <span><i class="swatch swatch-line" style="border-top-color:#c2410c;"></i>Expected on time</span>
+                <span><i class="swatch swatch-line"></i>80% target</span>
               </div>
             </div>
-            <div class="chart-container" style="height:260px; margin-top:1rem;">
+            <div class="chart-container trend-chart">
               <canvas id="dailyAdherenceChart"></canvas>
             </div>
             <p class="empty-state" id="trend-empty" style="display:none;">
-              No prescribed doses fall inside this window. Add a schedule, or widen the window.
+              No prescribed doses fall inside this window. Add a medicine, or widen the window.
             </p>
           </div>
 
-          <!-- HEATMAP -->
           <div class="card span-2">
-            <h3 style="font-family:'Outfit'; margin-bottom:0.35rem;">When doses get missed</h3>
-            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.25rem;">
-              Miss rate by weekday and scheduled hour &mdash; surfaces the weekend effect and evening drift.
-            </p>
+            <h2 class="card-title">When doses are missed <button class="info-icon" type="button" tabindex="0" data-tip="Grid of every scheduled dose by weekday and time of day. Darker cell = that slot was missed more often. Only recent weeks count, so an improvement shows soon." aria-label="How the missed-dose grid works">i</button></h2>
+            <p class="muted card-copy">Darker means more missed doses. Lighter cells have fewer records.</p>
             <div id="miss-heatmap"></div>
             <div class="heatmap-scale" id="heatmap-scale" style="display:none;">
-              <span class="vital-label" style="margin:0;">0%</span>
+              <span class="vital-label">0%</span>
               <div class="scale-ramp"></div>
-              <span class="vital-label" style="margin:0;">100% missed</span>
+              <span class="vital-label">100% missed</span>
             </div>
             <p class="empty-state" id="heatmap-empty" style="display:none;">
-              Not enough dose events yet to show a pattern.
+              Not enough doses recorded yet to show a pattern.
             </p>
           </div>
 
-          <!-- LATENESS + WINDOW FACTS -->
           <div class="card">
-            <h3 style="font-family:'Outfit'; margin-bottom:1.25rem;">Window detail</h3>
+            <h2 class="card-title">Numbers behind this report <button class="info-icon" type="button" tabindex="0" data-tip="Numerator and denominator behind every percentage above, so you can see the actual doses counted, not just a rate." aria-label="About the numbers list">i</button></h2>
             <dl class="fact-list" id="window-facts"></dl>
           </div>
 
-          <!-- METHODS -->
           <div class="card span-3">
             <details class="methods-panel">
               <summary>
-                <h3 style="font-family:'Outfit'; display:inline;">Methods &amp; definitions</h3>
-                <span style="color:var(--text-muted); font-size:0.85rem;">&nbsp;&mdash; how every number above is computed</span>
+                <span class="summary-title">Methods and definitions</span>
+                <span class="summary-hint">How every number above is calculated</span>
               </summary>
               <div id="methods-body"></div>
             </details>
@@ -391,59 +370,102 @@
         </div>
       </section>
 
-      <!-- SETTINGS SECTION -->
-      <section id="section-settings" class="content-section animate-fade-up" style="display:none;">
-        <header><h1>System Configuration</h1></header>
-        <div class="grid" style="margin-top:2rem;">
-            <div class="card span-2">
-                <h3>Device Pairing</h3>
-                <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:1.5rem;">Use this UID on your ESP32 setup portal to link the box to the <strong style="color:white;">currently selected patient</strong>.</p>
-                <div id="device-pairing-uid" style="padding:1.5rem; background:var(--bg-primary); border-radius:12px; font-family:monospace; font-size:1.2rem; display:inline-block; border:1px solid var(--emerald-glow);">
-                    Select a patient first
-                </div>
-            </div>
-
-            <div class="card sim-suite">
-                <h3>System Sim-Suite</h3>
-                <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom:1.5rem;">Clinical event bypass for dashboard validation.</p>
-                <div style="display:flex; gap:10px;">
-                    <button class="btn-pill btn-pill-primary" id="sim-taken" style="font-size:0.7rem; flex:1;">SIM TAKEN</button>
-                    <button class="btn-pill btn-pill-secondary" id="sim-missed" style="font-size:0.7rem; flex:1;">SIM MISSED</button>
-                </div>
-
-                <div style="margin-top:1.75rem; padding-top:1.5rem; border-top:1px solid var(--surface-border);">
-                    <h4 style="font-size:0.9rem; margin-bottom:0.4rem;">Seed history</h4>
-                    <p style="color:var(--text-muted); font-size:0.8rem; margin-bottom:1rem;">
-                        Generates dose events against this patient's actual schedules so the
-                        Analytics section has something to show. Every record is tagged
-                        <code>simulated</code> and can be removed again.
-                    </p>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <input type="number" id="seed-days" value="60" min="1" max="180"
-                               style="width:80px; padding:10px; background:var(--bg-primary); border:1px solid var(--surface-border); border-radius:8px; color:white;">
-                        <span style="color:var(--text-muted); font-size:0.8rem;">days</span>
-                        <button class="btn-pill btn-pill-primary" id="seed-history" style="font-size:0.7rem; flex:1;">SEED</button>
-                    </div>
-                    <button class="btn-pill btn-pill-secondary" id="clear-sim" style="font-size:0.7rem; width:100%; margin-top:10px;">CLEAR SIMULATED DATA</button>
-                </div>
-            </div>
+      <!-- MORE -->
+      <section id="section-more" class="content-section animate-fade-up" style="display:none;">
+        <header class="page-header">
+          <div class="header-title">
+            <h1>More</h1>
+            <p>Everything else, kept out of the way.</p>
+          </div>
+        </header>
+        <div class="more-grid">
+          <button type="button" class="more-link" data-goto="section-patients" data-nav="nav-more">
+            <strong>People</strong>
+            <span>Add or switch the person you care for.</span>
+          </button>
+          <button type="button" class="more-link" data-goto="section-analytics" data-nav="nav-more">
+            <strong>Reports</strong>
+            <span>Weekly dose patterns and model details.</span>
+          </button>
+          <button type="button" class="more-link" data-goto="section-settings" data-nav="nav-more">
+            <strong>Device &amp; settings</strong>
+            <span>Pair the box and open developer tools.</span>
+          </button>
+          <button type="button" class="more-link" id="more-logout">
+            <strong>Sign out</strong>
+            <span>End this session on this device.</span>
+          </button>
         </div>
       </section>
 
+      <!-- DEVICE & SETTINGS -->
+      <section id="section-settings" class="content-section animate-fade-up" style="display:none;">
+        <header class="page-header">
+          <div class="header-title">
+            <h1>Device &amp; settings</h1>
+            <p>Pair the box and manage test data.</p>
+          </div>
+        </header>
+        <div class="grid">
+          <div class="card span-2">
+            <h2 class="card-title">Pair the box</h2>
+            <p class="muted card-copy">Use this box ID in the ESP32 setup portal. It links the box to the person currently selected in SmartMed.</p>
+            <div id="device-pairing-uid" class="pairing-id">Select a person first</div>
+          </div>
+
+          <details class="dev-tools span-3">
+            <summary>Developer tools</summary>
+            <div class="card sim-suite">
+              <h2 class="card-title">Test controls</h2>
+              <p class="muted card-copy">Send events or build a demo patient for checking the dashboard. Test records are tagged <code>simulated</code>.</p>
+              <div class="sim-actions">
+                <button class="btn-pill btn-pill-primary" id="sim-taken" type="button">Simulate taken</button>
+                <button class="btn-pill btn-pill-secondary" id="sim-missed" type="button">Simulate missed</button>
+              </div>
+
+              <div class="dev-section">
+                <h3>Demo patient</h3>
+                <p class="muted card-copy">Creates or refreshes a demo patient with three daily medicines and 60 days of recent dose events.</p>
+                <button class="btn-pill btn-pill-primary" id="create-demo-patient" type="button">Create / refresh demo patient</button>
+              </div>
+
+              <div class="dev-section">
+                <h3>Seed history</h3>
+                <p class="muted card-copy">Generates dose events for the selected person's current medicines.</p>
+                <div class="seed-row">
+                  <input type="number" id="seed-days" value="60" min="1" max="180" aria-label="Days of history">
+                  <span class="muted">days</span>
+                  <button class="btn-pill btn-pill-primary" id="seed-history" type="button">Seed</button>
+                </div>
+                <button class="btn-pill btn-pill-secondary clear-button" id="clear-sim" type="button">Clear simulated data</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
     </main>
   </div>
 
-  <!-- Toast Notification System -->
-  <div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 1000;"></div>
+  <div id="toast-container" aria-live="polite"></div>
 
-  <!-- SCRIPTS -->
   <!-- Firebase SDK (compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <script>
+    // Dev hook: add ?stub=1 to use the local Firebase stub instead of the real backend
+    // (any email/password signs in). See .opencode/firebase-stub.js for the patient data.
+    // Must load AFTER the real SDK: it overwrites window.firebase before app.js runs.
+    if (new URLSearchParams(location.search).has('stub')) {
+      document.write('<script src="/.opencode/firebase-stub.js"><\/script>');
+    }
+  </script>
   <!-- Pure computation, then the rendering layer that consumes it -->
   <script src="analytics.js"></script>
+  <script src="ml-model.js"></script>
+  <script src="ml-risk.js"></script>
   <script src="analytics-ui.js"></script>
+  <script src="llm.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

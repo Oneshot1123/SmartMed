@@ -1,0 +1,53 @@
+- generic [ref=f2e17]:
+  - complementary [ref=f2e18]:
+    - navigation "Main navigation" [ref=f2e24]:
+      - link "Today" [ref=f2e25] [cursor=pointer]:
+        - /url: "#"
+      - link "Medicines" [active] [ref=f2e26] [cursor=pointer]:
+        - /url: "#"
+      - link "History" [ref=f2e27] [cursor=pointer]:
+        - /url: "#"
+      - link "More" [ref=f2e28] [cursor=pointer]:
+        - /url: "#"
+  - main [ref=f2e29]:
+    - generic [ref=f2e373]:
+      - generic [ref=f2e375]:
+        - heading "Medicines" [level=1] [ref=f2e376]
+        - paragraph [ref=f2e377]: Add each medicine, its time, and its box slot.
+      - generic [ref=f2e378]:
+        - generic [ref=f2e379]:
+          - heading "Add a medicine" [level=2] [ref=f2e380]
+          - generic [ref=f2e381]:
+            - generic [ref=f2e382]:
+              - generic [ref=f2e383]: Medicine name
+              - textbox "Medicine name" [ref=f2e384]:
+                - /placeholder: e.g. Aspirin
+            - generic [ref=f2e385]:
+              - generic [ref=f2e386]: Time
+              - textbox "Time" [ref=f2e387]
+            - generic [ref=f2e388]:
+              - generic [ref=f2e389]: Box slot
+              - combobox "Box slot" [ref=f2e390]:
+                - option "Slot 1" [selected]
+                - option "Slot 2"
+                - option "Slot 3"
+            - button "Add medicine" [ref=f2e392] [cursor=pointer]
+        - generic [ref=f2e393]:
+          - heading "Current medicines" [level=2] [ref=f2e394]
+          - generic [ref=f2e395]:
+            - generic [ref=f2e396]:
+              - generic [ref=f2e397]:
+                - heading "Metformin" [level=3] [ref=f2e398]
+                - paragraph [ref=f2e399]: 8:00 AM · slot 1
+              - button "Remove Metformin" [ref=f2e400] [cursor=pointer]
+            - generic [ref=f2e403]:
+              - generic [ref=f2e404]:
+                - heading "Amlodipine" [level=3] [ref=f2e405]
+                - paragraph [ref=f2e406]: 2:00 PM · slot 2
+              - button "Remove Amlodipine" [ref=f2e407] [cursor=pointer]
+            - generic [ref=f2e410]:
+              - generic [ref=f2e411]:
+                - heading "Atorvastatin" [level=3] [ref=f2e412]
+                - paragraph [ref=f2e413]: 8:30 PM · slot 3
+              - button "Remove Atorvastatin" [ref=f2e414] [cursor=pointer]
+    - text: ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸

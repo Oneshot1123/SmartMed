@@ -1,0 +1,20 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - heading "SmartMed" [level=2] [ref=e7]
+    - paragraph [ref=e8]: Sign in to see medicines and box updates.
+    - generic [ref=e9]:
+      - generic [ref=e10]: Email
+      - textbox "Email" [ref=e11]:
+        - /placeholder: you@example.com
+        - text: caregiver@example.com
+      - generic [ref=e12]: Password
+      - textbox "Password" [ref=e13]:
+        - /placeholder: Your password
+        - text: test-password
+      - button "Sign in" [active] [ref=e14] [cursor=pointer]
+      - paragraph [ref=e15]: "Firebase: Error (auth/invalid-login-credentials)."
+      - paragraph [ref=e16]:
+        - text: Don't have an account?
+        - link "Create one" [ref=e17] [cursor=pointer]:
+          - /url: "#"
+  - text: ▸

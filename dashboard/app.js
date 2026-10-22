@@ -16,11 +16,11 @@ const db = firebase.database();
 const auth = firebase.auth();
 
 // 2. STATE & UI ELEMENTS
-let adherenceChart;
 let caregiverUID = null;
 let patientID = null; // Currently selected patient
 let currentSchedules = {};
 let currentHistory = {};  // full dose-event log for the selected patient; feeds the analytics
+let currentStatus = null;
 
 const authView = document.getElementById('auth-view');
 const dashboardView = document.getElementById('dashboard-view');
@@ -31,8 +31,9 @@ let isSignUpMode = false;
 document.getElementById('toggle-signup').addEventListener('click', (e) => {
     e.preventDefault();
     isSignUpMode = !isSignUpMode;
-    document.getElementById('auth-btn').textContent = isSignUpMode ? 'Register Account' : 'Initiate Session';
-    document.getElementById('toggle-signup').textContent = isSignUpMode ? 'Back to Login' : 'Sign Up';
+    document.getElementById('auth-btn').textContent = isSignUpMode ? 'Create account' : 'Sign in';
+    document.getElementById('toggle-signup').textContent = isSignUpMode ? 'Back to sign in' : 'Create one';
+    document.getElementById('password').autocomplete = isSignUpMode ? 'new-password' : 'current-password';
 });
 
 document.getElementById('login-form').addEventListener('submit', (e) => {
@@ -61,42 +62,70 @@ function handleAuthSuccess(user) {
     showToast("Authentication Successful");
 }
 
-document.getElementById('logout-btn').addEventListener('click', () => {
+function signOutUser() {
     auth.signOut().then(() => {
         dashboardView.style.display = 'none';
         authView.style.display = 'flex';
-        patientID = null; // Clear context
-    });
-});
+        patientID = null;
+        currentStatus = null;
+        currentHistory = {};
+        currentSchedules = {};
+        currentPatientName = '';
+        window.SmedLLM.clear();
+        resetExplain();
+    }).catch(err => showToast('Sign out failed: ' + (err.message || err), true));
+}
+
+const logoutBtn = document.getElementById('logout-btn');
+if (logoutBtn) logoutBtn.addEventListener('click', signOutUser);
+const moreLogout = document.getElementById('more-logout');
+if (moreLogout) moreLogout.addEventListener('click', signOutUser);
 
 // SPA Navigation
-const navItems = document.querySelectorAll('.nav-item');
+const navItems = document.querySelectorAll('.nav-links .nav-item');
 const sections = document.querySelectorAll('.content-section');
+
+function showSection(sectionId, navId) {
+    const target = document.getElementById(sectionId);
+    if (!target) return;
+
+    sections.forEach(s => {
+        s.style.display = 'none';
+        s.classList.remove('active');
+    });
+    target.style.display = 'block';
+    target.classList.add('active');
+
+    navItems.forEach(n => {
+        const active = n.id === navId;
+        n.classList.toggle('active', active);
+        if (active) n.setAttribute('aria-current', 'page');
+        else n.removeAttribute('aria-current');
+    });
+
+    if (mainContent) mainContent.scrollTop = 0;
+    window.scrollTo(0, 0);
+    // Chart.js gets a zero-size canvas if it is created while hidden, so rebuild
+    // the report after the section has real layout.
+    if (sectionId === 'section-analytics') refreshAnalytics();
+}
 
 navItems.forEach(item => {
     item.addEventListener('click', (e) => {
-        if (item.id === 'logout-btn') return;
         e.preventDefault();
-        
-        // Remove active states
-        navItems.forEach(n => n.classList.remove('active'));
-        sections.forEach(s => s.style.display = 'none');
+        showSection('section-' + item.id.replace('nav-', ''), item.id);
+    });
+});
 
-        // Set active
-        item.classList.add('active');
-        const targetId = 'section-' + item.id.replace('nav-', '');
-        document.getElementById(targetId).style.display = 'block';
-
-        // Chart.js measures its canvas on creation. If the chart was built while this
-        // section was display:none it got a zero-sized box, so repaint now that the
-        // section is actually laid out.
-        if (item.id === 'nav-analytics') refreshAnalytics();
+document.querySelectorAll('[data-goto]').forEach(link => {
+    link.addEventListener('click', (e) => {
+        e.preventDefault();
+        showSection(link.dataset.goto, link.dataset.nav || 'nav-more');
     });
 });
 
 // 4. DASHBOARD INITIALIZATION
 function initDashboard() {
-    initChart();
     attachCaregiverListeners();
     attachSchedulerListeners();
     attachAddPatientListeners();
@@ -128,6 +157,7 @@ function attachCaregiverListeners() {
     db.ref(`caregivers/${caregiverUID}/patients`).on('value', snap => {
         const patients = snap.val();
         renderPatientsGrid(patients);
+        renderPatientSelect(patients);
 
         // Auto-select first patient if none selected
         if (!patientID && patients) {
@@ -137,6 +167,38 @@ function attachCaregiverListeners() {
             switchPatient(null);
         }
     }, err => reportDbError('load your patient list', err));
+
+    const explainBtn = document.getElementById('explain-btn');
+    if (explainBtn) explainBtn.onclick = runExplain;
+}
+
+function renderPatientSelect(patients) {
+    const select = document.getElementById('patient-select');
+    if (!select) return;
+
+    select.innerHTML = '';
+    if (!patients || !Object.keys(patients).length) {
+        const option = document.createElement('option');
+        option.textContent = 'No person added yet';
+        select.appendChild(option);
+        select.disabled = true;
+        return;
+    }
+
+    select.disabled = false;
+    Object.entries(patients).forEach(([uid, data]) => {
+        const option = document.createElement('option');
+        option.value = uid;
+        option.dataset.name = data.name || 'this person';
+        option.textContent = data.name || 'Unnamed person';
+        select.appendChild(option);
+    });
+    if (patientID && patients[patientID]) select.value = patientID;
+
+    select.onchange = () => {
+        const option = select.options[select.selectedIndex];
+        switchPatient(select.value, option ? option.dataset.name : '');
+    };
 }
 
 function renderPatientsGrid(patients) {
@@ -149,31 +211,29 @@ function renderPatientsGrid(patients) {
 
     Object.entries(patients).forEach(([uid, data]) => {
         const isActive = uid === patientID;
-        const initials = data.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+        const displayName = data.name || 'Unnamed person';
+        const initials = displayName.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
         const borderStyle = isActive ? 'border: 2px solid var(--emerald-glow); padding: 1.4rem;' : 'border: 1px solid var(--surface-border); padding: 1.5rem;';
         
         const card = document.createElement('div');
         card.className = `card span-2`;
         card.style.cssText = `${borderStyle} cursor:pointer; transition:all 0.2s ease;`;
-        card.onclick = () => switchPatient(uid, data.name);
-        
+        card.onclick = () => switchPatient(uid, displayName);
+
         card.innerHTML = `
-            <div style="display:flex; gap:2rem;">
-                <div style="width:100px; height:100px; background:var(--surface-hover); border-radius:25px; display:flex; align-items:center; justify-content:center; font-size:2.5rem; font-weight:800; color:var(--emerald-heal); border:1px solid var(--surface-border);">
+            <div style="display:flex; gap:1.25rem; align-items:center; flex-wrap:wrap;">
+                <div style="width:72px; height:72px; background:var(--surface-hover); border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:1.75rem; font-weight:800; color:var(--emerald-heal); border:1px solid var(--surface-border);">
                     ${initials}
                 </div>
-                <div style="flex:1;">
-                    <h2 style="font-family:'Outfit'; font-size:1.75rem; margin-bottom:0.5rem; color:${isActive ? 'var(--emerald-heal)' : 'white'};">${data.name} ${isActive ? '<span style="font-size:0.8rem; background:var(--emerald-heal); color:black; padding:2px 8px; border-radius:10px; vertical-align:middle;">ACTIVE</span>' : ''}</h2>
-                    <div style="display:flex; gap:1.5rem; flex-wrap:wrap;">
-                        <div><span class="vital-label">AGE</span><span style="font-weight:700;">${data.age}</span></div>
-                        <div><span class="vital-label">CONDITION</span><span style="font-weight:700;">${data.condition}</span></div>
-                        <div><span class="vital-label">UID</span><span style="font-weight:700; color:var(--text-muted); font-size:0.8rem; font-family:monospace;">${uid}</span></div>
+                <div style="flex:1; min-width:200px;">
+                    <h2 style="font-family:'Outfit'; font-size:1.35rem; margin-bottom:0.35rem; color:${isActive ? 'var(--emerald-heal)' : 'white'};">${displayName} ${isActive ? '<span class="active-tag">Selected</span>' : ''}</h2>
+                    <div style="display:flex; gap:1.25rem; flex-wrap:wrap;">
+                        <div><span class="vital-label">AGE</span><span style="font-weight:700;">${data.age || '--'}</span></div>
+                        <div><span class="vital-label">CONDITION</span><span style="font-weight:700;">${data.condition || '--'}</span></div>
                     </div>
                 </div>
             </div>
-            <div style="margin-top:1.5rem; padding:1rem; background:rgba(255,255,255,0.02); border-radius:12px; border:1px solid var(--surface-border);">
-                <p style="font-size:0.9rem; color:var(--text-muted);">${data.notes}</p>
-            </div>
+            <p class="muted patient-note">${data.notes || ''}</p>
         `;
         grid.appendChild(card);
     });
@@ -215,6 +275,7 @@ function attachAddPatientListeners() {
 }
 
 let activeListeners = [];
+let currentPatientName = '';
 function switchPatient(uid, name = "") {
     patientID = uid;
 
@@ -225,51 +286,36 @@ function switchPatient(uid, name = "") {
     // Drop the previous patient's data so nothing bleeds into the new patient's analytics
     currentHistory = {};
     currentSchedules = {};
+    currentStatus = null;
+    const historyBody = document.getElementById('history-body');
+    if (historyBody) historyBody.innerHTML = '';
+    SmedLLM.clear();
+    resetExplain();
     refreshAnalytics();
 
-    // Clear UI Data
     if (!uid) {
-        document.getElementById('patient-name-top').textContent = "No Patient Selected";
-        document.getElementById('patient-subtitle').textContent = "Please add a patient.";
-        document.getElementById('device-pairing-uid').textContent = "Select a patient first";
+        currentPatientName = '';
+        document.getElementById('patient-subtitle').textContent = "Add someone you care for to begin.";
+        document.getElementById('device-pairing-uid').textContent = "Select a person first";
         return;
     }
 
-    document.getElementById('patient-name-top').textContent = name;
-    document.getElementById('patient-subtitle').textContent = `Currently monitoring adherence for ${name}`;
+    const displayName = name || 'this person';
+    currentPatientName = displayName;
+    document.getElementById('patient-subtitle').textContent = `A simple view of ${displayName}'s medicines and box.`;
     document.getElementById('device-pairing-uid').textContent = uid;
-    document.querySelector('.avatar').textContent = name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+    const select = document.getElementById('patient-select');
+    if (select) select.value = uid;
 
-    showToast(`Switched to patient: ${name}`);
+    showToast(`Showing ${displayName}`);
 
     // Re-attach listeners for this specific patient
     attachRealTimeListeners();
-    // Re-render patient grid to show active state
-    db.ref(`caregivers/${caregiverUID}/patients`).once('value').then(snap => renderPatientsGrid(snap.val()));
-}
-
-function initChart() {
-    const ctx = document.getElementById('adherenceChart').getContext('2d');
-    adherenceChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Taken', 'Missed'],
-            datasets: [{
-                data: [0, 0],
-                backgroundColor: ['#10b981', '#f43f5e'],
-                borderWidth: 0,
-                hoverOffset: 10
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '80%',
-            plugins: {
-                legend: { display: false }
-            },
-            animation: { animateScale: true }
-        }
+    // Re-render both lists so the selected person is marked
+    db.ref(`caregivers/${caregiverUID}/patients`).once('value').then(snap => {
+        const patients = snap.val();
+        renderPatientsGrid(patients);
+        renderPatientSelect(patients);
     });
 }
 
@@ -282,7 +328,6 @@ function attachRealTimeListeners() {
         { path: `history/${patientID}`, cb: snap => updateHistoryTable(snap.val(), 'history-body'), query: ref => ref.limitToLast(5) },
         { path: `history/${patientID}`, cb: snap => {
             currentHistory = snap.val() || {};
-            updateFullHistoryTable(currentHistory);
             refreshAnalytics();
         }},
         { path: `schedules/${patientID}`, cb: snap => {
@@ -301,29 +346,53 @@ function attachRealTimeListeners() {
 }
 
 function updateDashboardUI(data) {
-    if (data.current_status) {
-        const badge = document.getElementById('status-badge');
-        const state = data.current_status.state || "Waiting";
-        badge.textContent = state;
-        badge.className = 'status-badge ' + state.toLowerCase();
-        document.getElementById('last-updated-time').textContent = 
-            data.current_status.last_updated ? data.current_status.last_updated.split('T')[1].substring(0,5) : "--:--";
-    }
+    if (!data) return;
+    if (data.current_status) currentStatus = data.current_status;
+    // Taken/missed are derived from the event log, never from stored counters.
+    renderToday();
+}
 
-    // Taken/Missed are DERIVED from the event log rather than read from
-    // patients/{id}/analytics. That stored counter is only ever incremented by the
-    // Sim-Suite -- the firmware never touches it -- so it reads 0 for real device
-    // activity. The log is the source of truth.
-    updateOverallSuccess();
+function formatTimeString(value) {
+    if (!value) return '--:--';
+    const parts = String(value).split(':');
+    const h = Number(parts[0]);
+    const m = Number(parts[1]);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return value;
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
 
-    if (data.profile) {
-        // Only update matrix elements if they exist (they might be in the grid now)
-        const pName = document.getElementById('p-name');
-        if (pName) pName.textContent = data.profile.name;
-    }
-    
-    // Inventory Prediction
-    calculateRefillDate(data);
+function formatStamp(value) {
+    if (!value) return '--';
+    const d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleString([], {
+        weekday: 'short', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit'
+    });
+}
+
+function logDate(log) {
+    if (!log || !log.date) return null;
+    const d = SmedAnalytics.parseDateKey(log.date);
+    const mins = SmedAnalytics.timeToMinutes(log.time);
+    if (mins != null) d.setMinutes(mins);
+    return d;
+}
+
+function latestLog() {
+    let latest = null;
+    let latestKey = '';
+    Object.values(currentHistory || {}).forEach(log => {
+        if (!log || !log.date) return;
+        const key = log.date + 'T' + (log.time || '00:00');
+        if (!latest || key > latestKey) {
+            latest = log;
+            latestKey = key;
+        }
+    });
+    return latest;
 }
 
 function calculateNextDose() {
@@ -332,13 +401,14 @@ function calculateNextDose() {
 
     const now = new Date();
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    
+
     let nextS = null;
     let minDiff = 1440; // max minutes in day
 
     Object.values(currentSchedules).forEach(s => {
-        const [h, m] = s.time.split(':').map(Number);
-        const schedMinutes = h * 60 + m;
+        if (!s || !s.time) return;
+        const schedMinutes = SmedAnalytics.timeToMinutes(s.time);
+        if (schedMinutes == null) return;
         const diff = schedMinutes - currentMinutes;
 
         if (diff > 0 && diff < minDiff) {
@@ -347,13 +417,233 @@ function calculateNextDose() {
         }
     });
 
+    const medEl = document.getElementById('next-dose-med');
+    const noteEl = document.getElementById('next-dose-note');
+
     if (nextS) {
-        nextDoseEl.textContent = nextS.time;
-        nextDoseEl.style.color = "var(--amber-caution)";
+        nextDoseEl.textContent = formatTimeString(nextS.time);
+        nextDoseEl.className = 'next-dose-time';
+        if (medEl) medEl.textContent = nextS.medName || 'Medicine';
+        if (noteEl) noteEl.textContent = 'Box slot ' + (nextS.compartment || '1');
     } else {
-        nextDoseEl.textContent = "None Today";
-        nextDoseEl.style.color = "var(--text-muted)";
+        nextDoseEl.textContent = "Done for today";
+        nextDoseEl.className = 'next-dose-time done';
+        if (medEl) medEl.textContent = Object.keys(currentSchedules || {}).length
+            ? 'All doses for today have passed.'
+            : 'No medicine scheduled.';
+        if (noteEl) noteEl.textContent = '';
     }
+}
+
+function renderToday() {
+    if (!window.SmedAnalytics) return;
+    const A = window.SmedAnalytics;
+    const now = new Date();
+    const todayKey = A.dateKey(now);
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+
+    const row = A.buildDailyTable(currentHistory, currentSchedules, todayKey, todayKey, null, nowMins)[0];
+    const assignments = (row && row.assignments) || [];
+    const prescribed = (A.expandPrescribed(currentSchedules, todayKey, todayKey)[todayKey]) || [];
+
+    const taken = row ? row.N : 0;
+    const missed = assignments.filter(a => !a.event).length;
+    const later = Math.max(0, prescribed.length - assignments.length);
+
+    const takenEl = document.getElementById('today-taken');
+    const missedEl = document.getElementById('today-missed');
+    const laterEl = document.getElementById('today-later');
+    if (takenEl) takenEl.textContent = taken;
+    if (missedEl) missedEl.textContent = missed;
+    if (laterEl) laterEl.textContent = later;
+
+    const list = document.getElementById('today-doses');
+    if (list) {
+        list.innerHTML = '';
+        if (!prescribed.length) {
+            const p = document.createElement('p');
+            p.className = 'empty-state';
+            p.textContent = 'No medicines scheduled yet. Add one on the Medicines page.';
+            list.appendChild(p);
+        } else {
+            prescribed.forEach(slot => {
+                const assignment = assignments.find(a => a.slot.id === slot.id);
+                let label = 'Later';
+                let cls = 'pending';
+                if (assignment && assignment.event) {
+                    label = 'Taken';
+                    cls = 'taken';
+                } else if (assignment) {
+                    label = 'No record';
+                    cls = 'missed';
+                }
+
+                const item = document.createElement('div');
+                item.className = 'dose-row';
+                const time = document.createElement('span');
+                time.className = 'dose-time';
+                time.textContent = formatTimeString(slot.time);
+                const med = document.createElement('span');
+                med.className = 'dose-med';
+                med.textContent = slot.medName + ' · slot ' + (slot.compartment || '1');
+                const chip = document.createElement('span');
+                chip.className = 'dose-chip ' + cls;
+                chip.textContent = label;
+                item.appendChild(time);
+                item.appendChild(med);
+                item.appendChild(chip);
+                list.appendChild(item);
+            });
+        }
+    }
+
+    const week = A.analyse(currentHistory, currentSchedules, 7);
+    const taking = week.summary.taking.value;
+    const weekValue = document.getElementById('week-taking');
+    const weekCaption = document.getElementById('week-caption');
+    const weekFill = document.getElementById('week-fill');
+    const weekNumbers = document.getElementById('week-numbers');
+    if (weekValue) weekValue.textContent = taking == null ? '--' : Math.round(taking) + '%';
+    if (weekCaption) {
+        weekCaption.textContent = taking == null
+            ? 'No doses recorded yet.'
+            : 'of scheduled doses taken this week';
+    }
+    if (weekFill) weekFill.style.width = (taking == null ? 0 : taking) + '%';
+    if (weekNumbers) {
+        weekNumbers.textContent = week.summary.totalPrescribed
+            ? week.summary.totalTaken + ' taken · ' + week.summary.totalMissed + ' no record'
+            : 'No scheduled doses this week.';
+    }
+
+    const latest = latestLog();
+    const boxStatus = document.getElementById('box-status');
+    const lastUpdated = document.getElementById('last-updated-time');
+
+    if (!latest) {
+        if (boxStatus) {
+            boxStatus.className = 'box-status checking';
+            boxStatus.textContent = currentStatus && currentStatus.last_updated
+                ? 'Waiting for first dose'
+                : 'No data yet';
+        }
+        if (lastUpdated) {
+            lastUpdated.textContent = currentStatus && currentStatus.last_updated
+                ? formatStamp(currentStatus.last_updated)
+                : '--';
+        }
+        return;
+    }
+
+    const latestDate = logDate(latest);
+    const today = A.parseDateKey(todayKey);
+    const daysSince = latestDate ? Math.round((today - A.parseDateKey(latest.date)) / 86400000) : null;
+    const staleAfter = (window.SmedRisk && window.SmedRisk.staleAfterDays) || 3;
+
+    if (boxStatus) {
+        const stale = daysSince != null && daysSince > staleAfter;
+        boxStatus.className = 'box-status ' + (stale ? 'warning' : 'ok');
+        boxStatus.textContent = stale ? 'Check the box' : 'Box connected';
+    }
+    if (lastUpdated) lastUpdated.textContent = latestDate ? formatStamp(latestDate) : '--';
+}
+
+/*
+ * Compact per-patient summary for the Groq explainer. Built from the same
+ * analytics calls the cards use, so the LLM can only describe numbers the
+ * caregiver can already see on screen.
+ * ponytail: passes top 3 risk doses; an LLM prompt survives on a small payload.
+ */
+function buildExplainStats() {
+    const A = window.SmedAnalytics;
+    if (!A || !patientID) return null;
+
+    const now = new Date();
+    const todayKey = A.dateKey(now);
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    const row = A.buildDailyTable(currentHistory, currentSchedules, todayKey, todayKey, null, nowMins)[0];
+    const assignments = (row && row.assignments) || [];
+    const prescribedToday = (A.expandPrescribed(currentSchedules, todayKey, todayKey)[todayKey]) || [];
+    const week = A.analyse(currentHistory, currentSchedules, 7).summary;
+
+    const stats = {
+        patient: currentPatientName || 'the patient',
+        today: {
+            scheduled: prescribedToday.length,
+            taken: row ? row.N : 0,
+            missed: assignments.filter(a => !a.event).length
+        },
+        last7days: {
+            scheduled: week.totalPrescribed || 0,
+            taken: week.totalTaken || 0,
+            missed: week.totalMissed || 0,
+            takingPercent: week.taking && week.taking.value == null ? null : Math.round(week.taking.value),
+            timingPercent: week.timing && week.timing.value == null ? null : Math.round(week.timing.value)
+        },
+        medicineTimes: Object.values(currentSchedules || {})
+            .filter(s => s && s.time)
+            .map(s => `${s.medName} ${formatTimeString(s.time)} (box slot ${s.compartment || '1'})`)
+    };
+
+    const latest = latestLog();
+    const latestDate = latest && latest.date ? A.parseDateKey(latest.date) : null;
+    const daysSince = latestDate ? Math.round((new Date(todayKey + 'T00:00') - latestDate) / 86400000) : null;
+    const staleAfter = (window.SmedRisk && window.SmedRisk.staleAfterDays) || 3;
+    stats.box = {
+        connected: !(daysSince != null && daysSince > staleAfter),
+        lastEventSeen: daysSince == null ? null : (daysSince === 0 ? 'today' : daysSince + ' days ago')
+    };
+
+    if (!stats.box.connected) return stats;
+
+    const R = window.SmedRisk;
+    if (R) {
+        const scored = R.scoreUpcoming(currentHistory, currentSchedules, { daysAhead: 7 });
+        if (scored.dataWarning) {
+            stats.dataPaused = scored.dataWarning.type;
+            return stats;
+        }
+        stats.upcoming = (scored.top || []).slice(0, 3).map(dose => ({
+            when: dose.date + ' ' + formatTimeString(dose.time),
+            medicine: (dose.medName || 'Medicine') + ' (box slot ' + (dose.compartment || '1') + ')',
+            chance: dose.level,
+            why: R.explainRisk(dose)
+        }));
+    }
+    return stats;
+}
+
+function resetExplain() {
+    const out = document.getElementById('explain-out');
+    const btn = document.getElementById('explain-btn');
+    if (out) { out.style.display = 'none'; out.textContent = ''; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Explain in simple words'; }
+}
+
+function runExplain() {
+    const btn = document.getElementById('explain-btn');
+    const out = document.getElementById('explain-out');
+    if (!btn || !out) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Thinking...';
+    window.SmedLLM.forget(patientID);
+    const stats = buildExplainStats();
+    window.SmedLLM.explain(patientID, stats).then(text => {
+        out.textContent = text;
+        out.style.display = 'block';
+        const disclaimer = document.getElementById('explain-disclaimer');
+        if (disclaimer) disclaimer.style.display = 'block';
+        btn.textContent = 'Explain again';
+        btn.disabled = false;
+    }).catch(err => {
+        out.textContent = (err && err.title ? err.title + ' — ' : '') + (err && err.hint || 'Something went wrong. Try again.');
+        out.style.display = 'block';
+        const disclaimer = document.getElementById('explain-disclaimer');
+        if (disclaimer) disclaimer.style.display = 'none';
+        btn.textContent = 'Try again';
+        btn.disabled = false;
+    });
 }
 
 function updateSchedulerUI(scheduleData) {
@@ -362,19 +652,19 @@ function updateSchedulerUI(scheduleData) {
     list.innerHTML = '';
 
     if (!scheduleData) {
-        list.innerHTML = '<p style="color:var(--text-muted); font-size:0.8rem; text-align:center;">No active prescriptions.</p>';
+        list.innerHTML = '<p class="empty-state">No medicines yet. Add one to get started.</p>';
         return;
     }
 
     Object.entries(scheduleData).forEach(([key, s]) => {
         const div = document.createElement('div');
-        div.style.cssText = `background:var(--bg-primary); padding:1rem; border-radius:12px; border:1px solid var(--surface-border); display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--cyan-data);`;
+        div.className = 'schedule-item';
         div.innerHTML = `
             <div>
-                <h4 style="font-size:0.9rem;">${s.medName}</h4>
-                <p style="font-size:0.75rem; color:var(--text-muted);">${s.time} | Comp ${s.compartment}</p>
+                <h3>${s.medName}</h3>
+                <p class="muted">${formatTimeString(s.time)} · slot ${s.compartment || '1'}</p>
             </div>
-            <button onclick="deleteSchedule('${key}')" style="background:none; border:none; color:var(--rose-alert); cursor:pointer;">
+            <button type="button" class="icon-button" onclick="deleteSchedule('${key}')" aria-label="Remove ${s.medName}">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
             </button>
         `;
@@ -416,108 +706,162 @@ function attachSchedulerListeners() {
     };
 }
 
-// Counts Taken/Missed straight from the event log and repaints the doughnut.
-function updateOverallSuccess() {
-    let taken = 0, missed = 0;
-    Object.values(currentHistory || {}).forEach(log => {
-        if (!log) return;
-        if (log.status === 'Taken') taken++;
-        else if (log.status === 'Missed') missed++;
-    });
-
-    document.getElementById('stat-taken').textContent = taken;
-    document.getElementById('stat-missed').textContent = missed;
-    if (adherenceChart) {
-        adherenceChart.data.datasets[0].data = [taken, missed];
-        adherenceChart.update();
-    }
-}
-
-function calculateRefillDate(data) {
-    // Doses per day comes from currentSchedules (populated from schedules/{patientID}).
-    // It previously read data.schedule -- a node under patients/{id} that nothing ever
-    // writes -- so this threw a TypeError on every status update and killed the card.
-    const dailyDoses = Object.keys(currentSchedules || {}).length || 3;
-    const pillsLeft = data.inventory ? data.inventory.count : 14; // no inventory node yet
-    const daysLeft = Math.floor(pillsLeft / dailyDoses);
-
-    document.getElementById('inv-count').textContent = pillsLeft + " Pills";
-    document.getElementById('inv-fill').style.width = Math.min(pillsLeft / 30 * 100, 100) + "%";
-    document.getElementById('refill-prediction').textContent = `Refill expected in ${daysLeft} days.`;
-}
-
 // Hands the raw log and regimen to the analytics layer, which does all the maths.
 function refreshAnalytics() {
     if (window.SmedAnalyticsUI) {
         window.SmedAnalyticsUI.render(currentHistory, currentSchedules);
     }
-    updateOverallSuccess();
+    renderDoseJournal(currentHistory);
+    renderToday();
+    calculateNextDose();
+}
+
+function sortedLogs(historyData) {
+    return Object.entries(historyData)
+        .map(([key, val]) => ({ id: key, ...val }))
+        .sort((a, b) => {
+            const ak = (a.date || '') + 'T' + (a.time || '');
+            const bk = (b.date || '') + 'T' + (b.time || '');
+            if (ak !== bk) return bk.localeCompare(ak);
+            return String(b.id).localeCompare(String(a.id));
+        });
 }
 
 function updateHistoryTable(historyData, containerId) {
     const tbody = document.getElementById(containerId);
     if (!tbody) return;
     tbody.innerHTML = '';
-    
-    if (!historyData) return;
 
-    const logs = Object.entries(historyData)
-        .map(([key, val]) => ({ id: key, ...val }))
-        .sort((a, b) => b.id.localeCompare(a.id));
-
-    logs.forEach(log => {
+    if (!historyData) {
         const tr = document.createElement('tr');
-        const statusColor = log.status === 'Taken' ? 'var(--emerald-heal)' : 'var(--rose-alert)';
-        
-        tr.innerHTML = `
-            <td style="color: var(--text-muted); padding-left: 1rem;">${log.time}</td>
-            <td style="font-weight: 700; color: ${statusColor}">● ${log.status.toUpperCase()}</td>
-            <td style="color: var(--text-muted);">${log.compartment ? 'Comp ' + log.compartment : '--'}</td>
-        `;
+        tr.innerHTML = '<td colspan="3" class="muted">No doses recorded yet.</td>';
         tbody.appendChild(tr);
-    });
-}
-
-// Detail column for the clinical log. Records written before the firmware started
-// logging the schedule that fired have none of these fields, so it degrades gracefully.
-function describeLog(log) {
-    const bits = [];
-    if (log.medName) bits.push(log.medName);
-    if (log.scheduledTime) bits.push(`due ${log.scheduledTime}`);
-    else if (log.scheduled_time) bits.push(`due ${log.scheduled_time}`);
-    if (typeof log.delaySec === 'number' && log.status === 'Taken') {
-        const mins = Math.round(log.delaySec / 60);
-        if (mins > 0) bits.push(`${mins} min late`);
-        else if (mins < 0) bits.push(`${-mins} min early`);
-        else bits.push('on time');
+        return;
     }
-    if (log.simulated) bits.push('simulated');
-    return bits.length ? bits.join(' · ') : '--';
-}
 
-function updateFullHistoryTable(historyData) {
-    const tbody = document.getElementById('full-history-body');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    
-    if (!historyData) return;
-
-    const logs = Object.entries(historyData)
-        .map(([key, val]) => ({ id: key, ...val }))
-        .sort((a, b) => b.id.localeCompare(a.id));
+    const logs = sortedLogs(historyData);
 
     logs.forEach(log => {
         const tr = document.createElement('tr');
-        const statusColor = log.status === 'Taken' ? 'var(--emerald-heal)' : 'var(--rose-alert)';
-        
+        const status = log.status === 'Taken' || log.status === 'Missed' ? log.status : 'Recorded';
+        const cls = status.toLowerCase();
+
         tr.innerHTML = `
-            <td>${log.date}</td>
-            <td>${log.time}</td>
-            <td style="font-weight: 700; color: ${statusColor}">${log.status}</td>
-            <td style="color: var(--text-muted)">${describeLog(log)}</td>
+            <td class="muted">${formatTimeString(log.time)}</td>
+            <td>${log.medName || 'Medicine'}</td>
+            <td><span class="result ${cls}">${status}</span></td>
         `;
         tbody.appendChild(tr);
     });
+}
+
+const JOURNAL_DAYS = 14;
+
+/*
+ * History as a day -> morning/afternoon/night -> medicine accordion.
+ *
+ * Native <details> keeps this cheap: the browser handles open/close, keyboard and
+ * screen-reader behaviour, so no toggle state lives in JS. Only the latest day starts
+ * open. Data comes from the same buildDailyTable pipeline the rest of the dashboard
+ * uses, so the chips here always match the Today card and the Reports numbers.
+ */
+function periodForMinutes(mins) {
+    if (mins < 12 * 60) return 'Morning';
+    if (mins < 18 * 60) return 'Afternoon';
+    return 'Night';
+}
+
+function renderDoseJournal(historyData) {
+    const host = document.getElementById('history-accordion');
+    if (!host) return;
+    host.innerHTML = '';
+
+    if (!historyData || !window.SmedAnalytics) {
+        const p = document.createElement('p');
+        p.className = 'empty-state';
+        p.textContent = 'No doses recorded yet. Once the box sends events they appear here by day.';
+        host.appendChild(p);
+        return;
+    }
+
+    const A = window.SmedAnalytics;
+    const today = new Date();
+    const todayKey = A.dateKey(today);
+    const nowMins = today.getHours() * 60 + today.getMinutes();
+    const fromKey = A.dateKey(A.addDays(today, -(JOURNAL_DAYS - 1)));
+    const rows = A.buildDailyTable(historyData, currentSchedules, fromKey, todayKey, null,
+        todayKey === A.dateKey(today) ? nowMins : null);
+
+    rows.slice().reverse().forEach(row => {
+        if (!row.assignments.length) return;
+
+        const day = document.createElement('details');
+        day.className = 'journal-day';
+        if (!host.childElementCount) day.open = true;
+
+        const summary = document.createElement('summary');
+        const dayLabel = document.createElement('strong');
+        dayLabel.textContent = A.parseDateKey(row.date).toLocaleDateString(undefined,
+            { weekday: 'short', day: 'numeric', month: 'short' });
+        const dayMeta = document.createElement('span');
+        const taken = row.assignments.filter(a => a.event).length;
+        dayMeta.textContent = `${taken} of ${row.assignments.length} taken`;
+        summary.appendChild(dayLabel);
+        summary.appendChild(dayMeta);
+        day.appendChild(summary);
+
+        const periods = [['Morning', []], ['Afternoon', []], ['Night', []]];
+        row.assignments.forEach(a => {
+            periods[periodForMinutes(a.slot.minutes) === 'Morning' ? 0
+                : periodForMinutes(a.slot.minutes) === 'Afternoon' ? 1 : 2][1].push(a);
+        });
+        periods.forEach(([label, items]) => {
+            if (!items.length) return;
+            const block = document.createElement('div');
+            block.className = 'journal-period';
+            const title = document.createElement('h3');
+            title.textContent = label;
+            block.appendChild(title);
+
+            items.forEach(a => {
+                const line = document.createElement('div');
+                line.className = 'dose-row';
+                const time = document.createElement('span');
+                time.className = 'dose-time';
+                time.textContent = formatTimeString(a.slot.time);
+                const med = document.createElement('span');
+                med.className = 'dose-med';
+                med.textContent = a.slot.medName + ' · slot ' + (a.slot.compartment || '1');
+                const chip = document.createElement('span');
+                chip.className = 'dose-chip';
+                if (a.event) {
+                    if (typeof a.deltaMin === 'number' && a.deltaMin > A.TIMING_WINDOW_MIN) {
+                        chip.classList.add('late');
+                        chip.textContent = 'Late';
+                    } else {
+                        chip.classList.add('taken');
+                        chip.textContent = 'Taken';
+                    }
+                } else {
+                    chip.classList.add('missed');
+                    chip.textContent = 'No record';
+                }
+                line.appendChild(time);
+                line.appendChild(med);
+                line.appendChild(chip);
+                block.appendChild(line);
+            });
+            day.appendChild(block);
+        });
+        host.appendChild(day);
+    });
+
+    if (!host.childElementCount) {
+        const p = document.createElement('p');
+        p.className = 'empty-state';
+        p.textContent = 'No doses recorded in the last 14 days.';
+        host.appendChild(p);
+    }
 }
 
 // 6. SIM-SUITE HANDLERS
@@ -525,12 +869,59 @@ function attachSimSuiteListeners() {
     const takenBtn = document.getElementById('sim-taken');
     const missedBtn = document.getElementById('sim-missed');
     const seedBtn = document.getElementById('seed-history');
+    const demoBtn = document.getElementById('create-demo-patient');
     const clearBtn = document.getElementById('clear-sim');
 
     if (takenBtn) takenBtn.onclick = () => simulateEvent("Taken");
     if (missedBtn) missedBtn.onclick = () => simulateEvent("Missed");
     if (seedBtn) seedBtn.onclick = () => seedHistory();
+    if (demoBtn) demoBtn.onclick = () => createDemoPatient();
     if (clearBtn) clearBtn.onclick = () => clearSimulatedData();
+}
+
+/*
+ * Builds a 60-day demo patient so the full dashboard can be checked end-to-end without
+ * touching a real participant. It is deliberately deterministic in structure (three
+ * schedules, weekend effect, evening drift) and uses a fixed ID, so clicking again
+ * refreshes the same patient instead of creating duplicates.
+ */
+function createDemoPatient() {
+    if (!caregiverUID) { showToast("Sign in before creating the demo patient.", true); return; }
+
+    const DEMO_ID = 'demo_patient_ml';
+    const DEMO_DAYS = 60;
+    const A = window.SmedAnalytics;
+    const now = new Date();
+    const startKey = A.dateKey(A.addDays(now, -(DEMO_DAYS - 1)));
+    const profile = {
+        name: 'Demo Patient',
+        age: '68',
+        condition: 'Hypertension',
+        notes: 'Demo patient with 60 days of simulated dose events for ML verification. Safe to remove.'
+    };
+    const schedules = {
+        demo_s1: { medName: 'Metformin', time: '08:00', compartment: 1, date: startKey, frequency: 'daily', active: true },
+        demo_s2: { medName: 'Amlodipine', time: '14:00', compartment: 2, date: startKey, frequency: 'daily', active: true },
+        demo_s3: { medName: 'Atorvastatin', time: '20:30', compartment: 3, date: startKey, frequency: 'daily', active: true }
+    };
+    const scheduleList = Object.entries(schedules).map(([key, s]) => ({ key, ...s }));
+    const seed = buildSeedPayload(scheduleList, DEMO_DAYS);
+
+    if (!seed.generated) {
+        showToast("Could not generate demo events for the current time.", true);
+        return;
+    }
+
+    Promise.all([
+        db.ref(`caregivers/${caregiverUID}/patients/${DEMO_ID}`).set(profile),
+        db.ref(`patients/${DEMO_ID}/profile`).set(profile),
+        db.ref(`patients/${DEMO_ID}/current_status`).set({ state: 'Waiting', last_updated: now.toISOString() }),
+        db.ref(`schedules/${DEMO_ID}`).set(schedules),
+        db.ref(`history/${DEMO_ID}`).set(seed.payload)
+    ]).then(() => {
+        showToast(`Demo patient ready: ${seed.generated} events across ${DEMO_DAYS} days.`);
+        switchPatient(DEMO_ID, profile.name);
+    }).catch(err => reportDbError('create demo patient', err));
 }
 
 /*
@@ -556,11 +947,7 @@ function seedHistory() {
 
     const days = Math.max(1, Math.min(180, parseInt(document.getElementById('seed-days').value, 10) || 60));
     const A = window.SmedAnalytics;
-    const payload = {};
-    let generated = 0;
-
     const today = new Date();
-    const nowMins = today.getHours() * 60 + today.getMinutes();
     const startKey = A.dateKey(A.addDays(today, -(days - 1)));
 
     // The analytics ignore days before a schedule's start date, so history seeded before a
@@ -574,6 +961,25 @@ function seedHistory() {
             s.date = startKey;
         }
     });
+
+    const seed = buildSeedPayload(schedules, days);
+    if (!seed.generated) { showToast("Schedules produced no doses in that range.", true); return; }
+
+    Promise.all([
+        db.ref(`history/${patientID}`).update(seed.payload),
+        db.ref(`schedules/${patientID}`).update(startUpdates)
+    ])
+        .then(() => showToast(`Seeded ${seed.generated} simulated events across ${days} days.`))
+        .catch(err => showToast("Seeding failed: " + err.message, true));
+}
+
+function buildSeedPayload(schedules, days) {
+    const A = window.SmedAnalytics;
+    const payload = {};
+    let generated = 0;
+
+    const today = new Date();
+    const nowMins = today.getHours() * 60 + today.getMinutes();
 
     for (let d = days - 1; d >= 0; d--) {
         const day = A.addDays(today, -d);
@@ -619,14 +1025,7 @@ function seedHistory() {
         });
     }
 
-    if (!generated) { showToast("Schedules produced no doses in that range.", true); return; }
-
-    Promise.all([
-        db.ref(`history/${patientID}`).update(payload),
-        db.ref(`schedules/${patientID}`).update(startUpdates)
-    ])
-        .then(() => showToast(`Seeded ${generated} simulated events across ${days} days.`))
-        .catch(err => showToast("Seeding failed: " + err.message, true));
+    return { payload, generated };
 }
 
 function addSeed(payload, dateStr, timeStr, status, schedule, scheduledTime, delaySec) {
@@ -675,6 +1074,7 @@ function clearSimulatedData() {
 }
 
 function simulateEvent(status) {
+    if (!patientID) { showToast("Select a person first.", true); return; }
     const now = new Date();
     const timestamp = Math.floor(now.getTime() / 1000);
     const dateStr = SmedAnalytics.dateKey(now);
@@ -686,8 +1086,8 @@ function simulateEvent(status) {
         last_updated: now.toISOString()
     }).catch(err => reportDbError('update status', err));
 
-    // No analytics counter write: Taken/Missed totals are derived from the log itself
-    // (see updateOverallSuccess), so a separate counter would only drift out of sync.
+    // No analytics counter write: totals are derived from the log itself, so a separate
+    // counter would only drift out of sync.
 
     // Add History. Tagged simulated so "Clear simulated data" can find it again.
     db.ref(`history/${patientID}/log_${timestamp}`).set({

@@ -10,6 +10,7 @@
   'use strict';
 
   var A = global.SmedAnalytics;
+  var R = global.SmedRisk;
 
   // Two-series categorical palette. NOT the dashboard's --emerald-heal/--amber-caution:
   // those sit outside the dark-mode OKLCH lightness band (L 0.696 / 0.769 vs the 0.48-0.67
@@ -99,37 +100,83 @@
     if (legend) legend.style.display = 'flex';
     if (empty) empty.style.display = 'none';
 
+    var forecast = R && R.forecastAdherence
+      ? R.forecastAdherence(state.history, state.schedules, state.windowDays)
+      : null;
+
     var labels = rows.map(function (r) { return r.date; });
+    var takingData = rows.map(function (r) { return r.takingPct; });
+    var timingData = rows.map(function (r) { return r.timingPct; });
     var showPoints = rows.length <= 31;
 
-    var data = {
-      labels: labels,
-      datasets: [
-        {
-          label: 'Taking',
-          data: rows.map(function (r) { return r.takingPct; }),
-          borderColor: COLOR_TAKING,
-          backgroundColor: COLOR_TAKING,
-          borderWidth: 2,
-          pointRadius: showPoints ? 4 : 0,
-          pointHoverRadius: 6,
-          tension: 0.25
-        },
-        {
-          label: 'Timing',
-          data: rows.map(function (r) { return r.timingPct; }),
-          borderColor: COLOR_TIMING,
-          backgroundColor: COLOR_TIMING,
-          borderWidth: 2,
-          // Secondary encoding: the two series differ by dash pattern as well as hue,
-          // so they stay distinguishable in greyscale and under CVD.
-          borderDash: [5, 4],
-          pointRadius: showPoints ? 4 : 0,
-          pointHoverRadius: 6,
-          tension: 0.25
-        }
-      ]
-    };
+    var datasets = [
+      {
+        label: 'Doses taken',
+        data: takingData,
+        borderColor: COLOR_TAKING,
+        backgroundColor: COLOR_TAKING,
+        borderWidth: 2,
+        pointRadius: showPoints ? 4 : 0,
+        pointHoverRadius: 6,
+        tension: 0.25
+      },
+      {
+        label: 'On time',
+        data: timingData,
+        borderColor: COLOR_TIMING,
+        backgroundColor: COLOR_TIMING,
+        borderWidth: 2,
+        // Secondary encoding: the two series differ by dash pattern as well as hue,
+        // so they stay distinguishable in greyscale and under CVD.
+        borderDash: [5, 4],
+        pointRadius: showPoints ? 4 : 0,
+        pointHoverRadius: 6,
+        tension: 0.25
+      }
+    ];
+
+    if (forecast) {
+      // Pad the forecast series with nulls so it starts on the last observed point, then
+      // continues as a dashed projection. The bridge keeps the eye on one continuous series.
+      labels = labels.concat(forecast.labels);
+      var padTaking = new Array(rows.length).fill(null);
+      var padTiming = new Array(rows.length).fill(null);
+      padTaking[rows.length - 1] = takingData[takingData.length - 1];
+      padTiming[rows.length - 1] = timingData[timingData.length - 1];
+
+      datasets.push({
+        label: 'Expected',
+        data: padTaking.concat(forecast.projectedTaking),
+        borderColor: COLOR_TAKING,
+        backgroundColor: COLOR_TAKING,
+        borderWidth: 2,
+        borderDash: [2, 4],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        tension: 0.25
+      });
+      datasets.push({
+        label: 'Expected on time',
+        data: padTiming.concat(forecast.projectedTiming),
+        borderColor: COLOR_TIMING,
+        backgroundColor: COLOR_TIMING,
+        borderWidth: 2,
+        borderDash: [2, 4],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        tension: 0.25
+      });
+    }
+
+    var caption = el('trend-caption');
+    if (caption) {
+      var base = 'Each point is one day. The two lines show doses taken and doses taken on time.';
+      caption.textContent = forecast
+        ? base + ' The dashed line is an estimate from the last 7 days, not recorded data.'
+        : base;
+    }
+
+    var data = { labels: labels, datasets: datasets };
 
     // The 80% threshold, drawn as a recessive dashed rule behind the data.
     var thresholdLine = {
@@ -174,6 +221,7 @@
             callbacks: {
               afterTitle: function (items) {
                 var row = rows[items[0].dataIndex];
+                if (!row) return 'Forecast  ·  model projection';
                 return WEEKDAYS[row.weekday] + '  ·  ' + row.N + ' of ' + row.P + ' doses';
               },
               label: function (ctx) {
@@ -351,7 +399,26 @@
           'calculation method moves the headline figure by ~25 points on identical behaviour ' +
           '(Rohay &amp; Dunbar-Jacob, Front Pharmacol. 2024;15:1460327). ' +
           'Full provenance in <code>RESEARCH_BASIS.md</code>.' +
-      '</div>';
+      '</div>' +
+      (R && R.modelInfo && R.modelInfo() ? (function () {
+        var info = R.modelInfo();
+        return '<div class="methods-citation" style="margin-top:1.25rem;">' +
+          '<strong style="color:var(--text-primary);">Risk model:</strong> L2-regularised ' +
+            'logistic regression over 17 engineered features (adherence windows, miss streaks, ' +
+            'slot/weekday history, timing drift, calendar position). Trained offline in Python ' +
+            'on a temporal split (last 20% of days); only the frozen coefficients ship to the browser. ' +
+            'Holdout AUC ' + (info.auc != null ? info.auc.toFixed(2) : '--') + '. ' +
+          '<strong style="color:var(--text-primary);">Forecast:</strong> Holt linear-trend ' +
+            'exponential smoothing (alpha ' + (info.forecast ? info.forecast.alpha : '--') +
+            ', beta ' + (info.forecast ? info.forecast.beta : '--') +
+            ', selected on a held-out tail) projects the next 7 days; it is a projection, not ' +
+            'recorded data. ' +
+          '<strong style="color:var(--text-primary);">Calibration:</strong> intercept corrected ' +
+            'to the observed base rate; real pilot data re-weights it at retrain once 20+ rows exist. ' +
+          'Probabilities support—not replace—clinical judgement. ' +
+          'Full model card in <code>ml/model_card.md</code>.' +
+        '</div>';
+      })() : '');
   }
 
   // --- Simulated-data banner ------------------------------------------------------
@@ -378,9 +445,222 @@
       var grid = section.querySelector('.grid');
       grid.insertBefore(existing, grid.firstChild);
     }
-    existing.textContent = 'This window includes ' + count +
-      ' simulated event' + (count === 1 ? '' : 's') +
-      ' seeded from the Sim-Suite. Clear them before reporting real adherence.';
+    existing.textContent = 'This report includes ' + count + ' test event' +
+      (count === 1 ? '' : 's') + '. Clear them before relying on these numbers.';
+  }
+
+  // --- ML risk radar --------------------------------------------------------------
+
+  function riskDateLabel(key) {
+    return A.parseDateKey(key).toLocaleDateString(undefined, {
+      weekday: 'short', day: 'numeric', month: 'short'
+    });
+  }
+
+  var NO_UPCOMING_TEXT = 'No doses scheduled yet. Add the first medicine to start.';
+
+  function riskWarningText(warning) {
+    if (warning.type === 'none') {
+      return 'Risk paused — no dose has been recorded yet. ' +
+        'Log the first dose to start scoring.';
+    }
+    var when = warning.lastEvent ? riskDateLabel(warning.lastEvent) : 'recently';
+    var ago = warning.daysSince != null ? ' (' + warning.daysSince + ' days ago)' : '';
+    return 'Risk paused — the box has not sent a dose update since ' + when + ago + '. ' +
+      'Check that it is powered on and connected. Scores return when new doses arrive.';
+  }
+
+  function probabilityBand(probability) {
+    if (probability >= 0.9) return 'Very high chance';
+    if (probability >= 0.6) return 'High chance';
+    if (probability >= 0.3) return 'Medium chance';
+    return 'Low chance';
+  }
+
+  function clockLabel(value) {
+    if (!value) return 'this dose';
+    var parts = String(value).split(':');
+    var h = Number(parts[0]);
+    var m = Number(parts[1]);
+    if (isNaN(h) || isNaN(m)) return value;
+    var d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function riskAction(dose) {
+    if (dose.level === 'low') return 'No action needed. Keep the current routine.';
+    var f = dose.features || {};
+    if (f.is_weekend >= 0.5) {
+      return 'Plan the weekend dose ahead — a reminder or a check-in can help.';
+    }
+    if (f.slot_miss_rate_14d >= 50) {
+      return 'Set a reminder shortly before ' + clockLabel(dose.time) + '.';
+    }
+    if (typeof f.roll7_taking === 'number' && f.roll7_taking < 80) {
+      return 'Check in before this dose this week.';
+    }
+    return 'A reminder before this dose can help.';
+  }
+
+  function renderRisk() {
+    var list = el('risk-list');
+    var empty = el('risk-empty');
+    var summary = el('risk-summary');
+    var note = el('risk-model-note');
+    var headline = el('risk-headline');
+    if (!list) return;
+
+    list.innerHTML = '';
+    if (summary) summary.innerHTML = '';
+    if (empty) {
+      empty.className = 'empty-state';
+      empty.textContent = NO_UPCOMING_TEXT;
+      empty.style.display = 'none';
+    }
+    if (headline) {
+      headline.textContent = '';
+      headline.className = 'risk-headline';
+      headline.style.display = 'none';
+    }
+
+    var info = R && R.modelInfo ? R.modelInfo() : null;
+    if (note) {
+      if (info) {
+        var source = info.real_rows
+          ? info.real_rows + ' real' +
+            (info.real_calibration_rows ? '' : ' (below calibration minimum)') + ' + '
+          : '';
+        note.textContent = 'Model ' + info.version + ' · ' + source +
+          (info.simulated_rows || 0).toLocaleString() + ' simulated labelled doses · ' +
+          'holdout AUC ' + (info.auc != null ? info.auc.toFixed(2) : '--') +
+          '. Probabilities are decision support, not a diagnosis.';
+      } else {
+        note.textContent = 'ML layer unavailable.';
+      }
+    }
+
+    if (!R || !A) return;
+
+    var result = R.scoreUpcoming(state.history, state.schedules, { daysAhead: 7 });
+
+    if (result.dataWarning) {
+      if (headline) {
+        headline.textContent = 'Risk paused';
+        headline.className = 'risk-headline warning';
+        headline.style.display = 'block';
+      }
+      if (empty) {
+        empty.textContent = riskWarningText(result.dataWarning);
+        empty.className = 'empty-state risk-warning';
+        empty.style.display = 'block';
+      }
+      return;
+    }
+
+    var doses = result.upcoming || [];
+    if (!doses.length) {
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+
+    var counts = { high: 0, medium: 0, low: 0 };
+    doses.forEach(function (d) { counts[d.level]++; });
+
+    var grouped = R.groupUpcoming
+      ? R.groupUpcoming(doses, 3)
+      : { groups: result.top || [], total: (result.top || []).length, doses: doses.length };
+    var shown = grouped.groups;
+
+    if (headline) {
+      var total = doses.length;
+      var text;
+      var level;
+      if (counts.high === total) {
+        text = total === 1
+          ? 'The next dose needs extra attention.'
+          : 'All ' + total + ' doses in the next 7 days need extra attention.';
+        level = 'high';
+      } else if (counts.high) {
+        text = counts.high + ' of ' + total + ' doses in the next 7 days need extra attention.';
+        level = 'high';
+      } else if (counts.medium) {
+        text = 'Nothing urgent. ' + counts.medium + ' ' +
+          (counts.medium === 1 ? 'dose is' : 'doses are') + ' worth watching.';
+        level = 'medium';
+      } else {
+        text = 'Nothing needs attention in the next 7 days.';
+        level = 'low';
+      }
+      headline.textContent = text;
+      headline.className = 'risk-headline ' + level;
+      headline.style.display = 'block';
+    }
+
+    shown.forEach(function (dose) {
+      var item = document.createElement('div');
+      item.className = 'risk-item ' + dose.level;
+
+      var when = document.createElement('div');
+      when.className = 'risk-when';
+      var time = document.createElement('strong');
+      time.textContent = clockLabel(dose.time);
+      var date = document.createElement('span');
+      date.textContent = dose.count > 1
+        ? 'On ' + dose.count + ' days'
+        : riskDateLabel(dose.exampleDate || dose.date);
+      when.appendChild(time);
+      when.appendChild(date);
+
+      var body = document.createElement('div');
+      body.className = 'risk-body';
+
+      var line = document.createElement('div');
+      line.className = 'risk-line';
+      var name = document.createElement('span');
+      name.className = 'risk-name';
+      name.textContent = (dose.medName || 'Medicine') + ' · box slot ' + (dose.compartment || '1');
+      var probability = document.createElement('span');
+      probability.className = 'risk-prob';
+      var band = document.createElement('span');
+      band.textContent = probabilityBand(dose.probability);
+      var pct = document.createElement('span');
+      pct.className = 'pct';
+      pct.textContent = Math.round(dose.probability * 100) + '%';
+      probability.appendChild(band);
+      probability.appendChild(pct);
+      line.appendChild(name);
+      line.appendChild(probability);
+
+      var bar = document.createElement('div');
+      bar.className = 'risk-bar';
+      var fill = document.createElement('i');
+      fill.style.width = Math.round(dose.probability * 100) + '%';
+      bar.appendChild(fill);
+
+      var reasons = document.createElement('div');
+      reasons.className = 'risk-reasons';
+      reasons.textContent = dose.level === 'low'
+        ? 'Recent pattern for this dose looks steady.'
+        : (R.explainRisk ? R.explainRisk(dose) : 'Based on the recent dose pattern.');
+
+      var action = document.createElement('div');
+      action.className = 'risk-action';
+      action.textContent = riskAction(dose);
+
+      body.appendChild(line);
+      body.appendChild(bar);
+      body.appendChild(reasons);
+      body.appendChild(action);
+      item.appendChild(when);
+      item.appendChild(body);
+      list.appendChild(item);
+    });
+
+    if (note && shown.length < grouped.total) {
+      note.textContent += ' Showing the ' + shown.length +
+        ' highest-risk schedule patterns of ' + grouped.total + '.';
+    }
   }
 
   // --- CSV export -----------------------------------------------------------------
@@ -409,13 +689,14 @@
 
     var subtitle = el('analytics-subtitle');
     if (subtitle) {
-      subtitle.textContent = 'Implementation-phase adherence, ' +
-        result.window.from + ' to ' + result.window.to;
+      subtitle.textContent = 'Dose patterns from ' +
+        result.window.from + ' to ' + result.window.to + '.';
     }
 
     renderSimBanner(state.history);
     renderTiles(result.summary);
     renderTrend(result);
+    renderRisk();
     renderHeatmap(result.heatmap);
     renderFacts(result);
     renderMethods(result);

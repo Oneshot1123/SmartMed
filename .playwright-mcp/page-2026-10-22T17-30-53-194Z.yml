@@ -1,0 +1,61 @@
+- generic [ref=f2e17]:
+  - complementary [ref=f2e18]:
+    - navigation "Main navigation" [ref=f2e24]:
+      - link "Today" [ref=f2e25] [cursor=pointer]:
+        - /url: "#"
+      - link "Medicines" [ref=f2e26] [cursor=pointer]:
+        - /url: "#"
+      - link "History" [ref=f2e27] [cursor=pointer]:
+        - /url: "#"
+      - link "More" [ref=f2e28] [cursor=pointer]:
+        - /url: "#"
+  - main [ref=f2e29]:
+    - generic [ref=f2e332]:
+      - generic [ref=f2e333]:
+        - generic [ref=f2e334]:
+          - heading "People" [level=1] [ref=f2e335]
+          - paragraph [ref=f2e336]: Add or switch the person you care for.
+        - button "+ Add person" [ref=f2e337] [cursor=pointer]
+      - generic [ref=f2e338]:
+        - generic [ref=f2e339] [cursor=pointer]:
+          - generic [ref=f2e340]:
+            - generic [ref=f2e341]: DP
+            - generic [ref=f2e342]:
+              - heading "Demo Patient Selected" [level=2] [ref=f2e343]:
+                - text: Demo Patient
+                - generic [ref=f2e344]: Selected
+              - generic [ref=f2e345]:
+                - generic [ref=f2e346]:
+                  - generic [ref=f2e347]: AGE
+                  - text: "68"
+                - generic [ref=f2e348]:
+                  - generic [ref=f2e349]: CONDITION
+                  - text: Hypertension
+          - paragraph [ref=f2e350]: Demo patient with recent simulated doses for visual checks.
+        - generic [ref=f2e351] [cursor=pointer]:
+          - generic [ref=f2e352]:
+            - generic [ref=f2e353]: SP
+            - generic [ref=f2e354]:
+              - heading "Stale Patient" [level=2] [ref=f2e355]
+              - generic [ref=f2e356]:
+                - generic [ref=f2e357]:
+                  - generic [ref=f2e358]: AGE
+                  - text: "74"
+                - generic [ref=f2e359]:
+                  - generic [ref=f2e360]: CONDITION
+                  - text: Arthritis
+          - paragraph [ref=f2e361]: No box updates for more than a month.
+        - generic [ref=f2e362] [cursor=pointer]:
+          - generic [ref=f2e363]:
+            - generic [ref=f2e364]: NP
+            - generic [ref=f2e365]:
+              - heading "New Patient" [level=2] [ref=f2e366]
+              - generic [ref=f2e367]:
+                - generic [ref=f2e368]:
+                  - generic [ref=f2e369]: AGE
+                  - text: "52"
+                - generic [ref=f2e370]:
+                  - generic [ref=f2e371]: CONDITION
+                  - text: No plan yet
+          - paragraph [ref=f2e372]: No medicines have been added.
+    - text: ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸

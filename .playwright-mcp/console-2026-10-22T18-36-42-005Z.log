@@ -1,0 +1,6 @@
+[  143278ms] [WARNING] [2026-10-22T18:39:05.281Z]  @firebase/app-compat: 
+    Warning: Firebase is already defined in the global scope. Please make sure
+    Firebase library is only loaded once.
+   @ https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js:0
+[  143308ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://localhost:8000/favicon.ico:0
+[  143968ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyDzGt90UApRGj30sj7tNqCAbsfZO2g6358:0

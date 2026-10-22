@@ -1,0 +1,30 @@
+- generic [ref=f3e17]:
+  - complementary [ref=f3e18]:
+    - navigation "Main navigation" [ref=f3e25]:
+      - link "Today" [ref=f3e26] [cursor=pointer]:
+        - /url: "#"
+      - link "Medicines" [ref=f3e32] [cursor=pointer]:
+        - /url: "#"
+      - link "History" [ref=f3e35] [cursor=pointer]:
+        - /url: "#"
+      - link "More" [active] [ref=f3e39] [cursor=pointer]:
+        - /url: "#"
+  - main [ref=f3e48]:
+    - text: ▸
+    - generic [ref=f3e183]:
+      - generic [ref=f3e185]:
+        - heading "More" [level=1] [ref=f3e186]
+        - paragraph [ref=f3e187]: Everything else, kept out of the way.
+      - generic [ref=f3e188]:
+        - button [ref=f3e189] [cursor=pointer]:
+          - strong [ref=f3e190]: People
+          - text: Add or switch the person you care for.
+        - button [ref=f3e191] [cursor=pointer]:
+          - strong [ref=f3e192]: Reports
+          - text: Weekly dose patterns and model details.
+        - button [ref=f3e193] [cursor=pointer]:
+          - strong [ref=f3e194]: Device & settings
+          - text: Pair the box and open developer tools.
+        - button [ref=f3e195] [cursor=pointer]:
+          - strong [ref=f3e196]: Sign out
+          - text: End this session on this device.

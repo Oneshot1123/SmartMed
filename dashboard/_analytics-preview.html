@@ -14,8 +14,8 @@
       <section id="section-analytics" class="content-section animate-fade-up" >
         <header style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
           <div class="header-title">
-            <h1>Adherence Analytics</h1>
-            <p id="analytics-subtitle">Implementation-phase adherence, computed per the EAMD framework</p>
+            <h1>Reports</h1>
+            <p id="analytics-subtitle">Weekly dose patterns and the evidence behind them.</p>
           </div>
           <div style="display:flex; gap:0.75rem; align-items:center;">
             <div class="window-switch" id="window-switch" role="group" aria-label="Observation window">
@@ -30,22 +30,22 @@
         <!-- KPI TILES -->
         <div class="grid" style="margin-top:1.5rem;">
           <div class="card metric-tile" style="grid-column: span 1;">
-            <span class="vital-label">Taking adherence</span>
+            <span class="vital-label">Doses taken</span>
             <div class="metric-value" id="metric-taking">--</div>
             <div class="metric-sub" id="metric-taking-sub">No data</div>
             <p class="metric-note">Doses taken &divide; doses prescribed</p>
           </div>
           <div class="card metric-tile" style="grid-column: span 1;">
-            <span class="vital-label">Timing adherence</span>
+            <span class="vital-label">Taken on time</span>
             <div class="metric-value" id="metric-timing">--</div>
             <div class="metric-sub" id="metric-timing-sub">No data</div>
             <p class="metric-note">Taken within &plusmn;60 min of the scheduled time</p>
           </div>
           <div class="card metric-tile" style="grid-column: span 1;">
-            <span class="vital-label">Correct-dosing days</span>
+            <span class="vital-label">Days with all doses</span>
             <div class="metric-value" id="metric-correct">--</div>
             <div class="metric-sub" id="metric-correct-sub">No data</div>
-            <p class="metric-note">Days with the exact prescribed dose count</p>
+            <p class="metric-note">Days where every scheduled dose was taken</p>
           </div>
 
           <!-- DAILY TREND -->
@@ -54,13 +54,15 @@
               <div>
                 <h3 style="font-family:'Outfit'; margin-bottom:0.35rem;">Daily adherence</h3>
                 <p style="color:var(--text-muted); font-size:0.85rem;" id="trend-caption">
-                  Each point is one day. The gap between the two lines is time-of-day drift.
+                  Each point is one day. The two lines show doses taken and doses taken on time.
                 </p>
               </div>
               <div class="chart-legend" id="trend-legend">
-                <span><i class="swatch" style="background:#0e9f6e;"></i>Taking</span>
-                <span><i class="swatch" style="background:#c2410c;"></i>Timing</span>
-                <span><i class="swatch swatch-line"></i>80% threshold</span>
+                <span><i class="swatch" style="background:#0e9f6e;"></i>Doses taken</span>
+                <span><i class="swatch" style="background:#c2410c;"></i>On time</span>
+                <span><i class="swatch swatch-line" style="border-top-color:#0e9f6e;"></i>Expected</span>
+                <span><i class="swatch swatch-line" style="border-top-color:#c2410c;"></i>Expected on time</span>
+                <span><i class="swatch swatch-line"></i>80% target</span>
               </div>
             </div>
             <div class="chart-container" style="height:260px; margin-top:1rem;">
@@ -71,12 +73,29 @@
             </p>
           </div>
 
+          <!-- ML RISK CARD (shown here for previewing; it lives on Today in the app) -->
+          <div class="card span-3" id="ml-risk-card">
+            <div class="section-head">
+              <div>
+                <h2 class="card-title">What to watch</h2>
+                <p class="muted">A heads-up about the next 7 days, based on the last 30 days of doses. This is not a diagnosis.</p>
+              </div>
+            </div>
+            <p class="risk-headline" id="risk-headline"></p>
+            <div class="risk-list" id="risk-list"></div>
+            <p class="empty-state" id="risk-empty" style="display:none;">
+              No doses scheduled yet. Add the first medicine to start.
+            </p>
+            <details class="risk-about">
+              <summary>How this is calculated</summary>
+              <p class="ml-footnote" id="risk-model-note"></p>
+            </details>
+          </div>
+
           <!-- HEATMAP -->
           <div class="card span-2">
-            <h3 style="font-family:'Outfit'; margin-bottom:0.35rem;">When doses get missed</h3>
-            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.25rem;">
-              Miss rate by weekday and scheduled hour &mdash; surfaces the weekend effect and evening drift.
-            </p>
+            <h2 class="card-title">When doses are missed</h2>
+            <p class="muted card-copy">Darker means more missed doses. Lighter cells have fewer records.</p>
             <div id="miss-heatmap"></div>
             <div class="heatmap-scale" id="heatmap-scale" >
               <span class="vital-label" style="margin:0;">0%</span>
@@ -84,13 +103,13 @@
               <span class="vital-label" style="margin:0;">100% missed</span>
             </div>
             <p class="empty-state" id="heatmap-empty" >
-              Not enough dose events yet to show a pattern.
+              Not enough doses recorded yet to show a pattern.
             </p>
           </div>
 
           <!-- LATENESS + WINDOW FACTS -->
           <div class="card">
-            <h3 style="font-family:'Outfit'; margin-bottom:1.25rem;">Window detail</h3>
+            <h2 class="card-title">Numbers behind this report</h2>
             <dl class="fact-list" id="window-facts"></dl>
           </div>
 
@@ -98,8 +117,8 @@
           <div class="card span-3">
             <details class="methods-panel">
               <summary>
-                <h3 style="font-family:'Outfit'; display:inline;">Methods &amp; definitions</h3>
-                <span style="color:var(--text-muted); font-size:0.85rem;">&nbsp;&mdash; how every number above is computed</span>
+                <span class="summary-title">Methods and definitions</span>
+                <span class="summary-hint">How every number above is calculated</span>
               </summary>
               <div id="methods-body"></div>
             </details>
@@ -109,6 +128,8 @@
 
       </main></div>
 <script src=analytics.js></script>
+<script src=ml-model.js></script>
+<script src=ml-risk.js></script>
 <script src=analytics-ui.js></script>
 <script src=_preview-data.js></script>
 </body></html>

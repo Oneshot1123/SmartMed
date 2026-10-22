@@ -249,6 +249,9 @@ A frequent assumption is that all of this comes from one paper. It does not:
 | Showing the three side by side, not merged | **Paper 4** — Rohay & Dunbar-Jacob 2024 |
 | The weekday × hour heatmap | **Burnier 2018** (supporting reference) |
 | Calling it "Implementation-phase" adherence | **Paper 1** — Vrijens et al. 2012 |
+| Per-dose risk model | **Paper 5** — Gu et al. 2021 (*Sci Rep*) |
+| 7-day forecast | **Paper 6** — Hyndman & Athanasopoulos 2021 |
+| Probability correction | **Paper 7** — Saerens et al. 2002 |
 
 Paper 2 is the largest contributor, but it does **not** cover the heatmap or the side-by-side
 reporting decision.
@@ -266,6 +269,8 @@ than things being overlooked.
 | Drug-holiday detection | Paper 3 / Burnier | Find runs of consecutive zero-dose days |
 | Variability (monthly SD) | Paper 4 | One standard-deviation call on the daily values |
 | Initiation & persistence | Paper 1 | First-dose date and last-dose date |
+| LSTM / sequence risk model | Paper 5 | Needs far more real per-patient history than the pilot provides |
+| TinyML / on-device inference | Paper 5 | Adds embedded risk; static JS inference is enough for the demo |
 
 All four appear in `RESEARCH_BASIS.md` with "No" in the implemented column. The daily table
 produced by `buildDailyTable()` in `dashboard/analytics.js` is the right starting point for
@@ -285,10 +290,13 @@ all of them.
 | All three side by side | Which number is honest? | — | Paper 4 |
 | Miss heatmap | *When* do they slip? | Weekday + scheduled hour | Burnier 2018 |
 | Phase labelling | What are we actually measuring? | — | Paper 1 |
+| Next-dose risk | Which upcoming dose needs attention? | Prior adherence + slot + calendar | Paper 5 |
+| 7-day forecast | Where is adherence heading? | Daily taking/timing series | Paper 6 |
 
 **In one sentence:** we compare the prescribed schedule against the IR-sensor event log,
-clean it using two rules from the 2020 EAMD framework, and report three standard adherence
-percentages plus a picture of when misses cluster.
+clean it using two rules from the 2020 EAMD framework, report three standard adherence
+percentages plus a picture of when misses cluster, and use past dose history to rank the
+risk of the upcoming doses and project the next 7 days.
 
 ---
 
@@ -307,16 +315,147 @@ Any window containing simulated events shows an amber warning banner.
 
 ```bash
 node dashboard/analytics.test.js
+node dashboard/ml-risk.test.js
 ```
 
-27 assertions run against hand-worked arithmetic, including the pooling guard described in
-section 4, the 30-minute dedup rule, the excluded non-use day, and the 95-minute-late dose.
+The first suite runs 27 assertions against hand-worked arithmetic, including the pooling guard
+described in section 4, the 30-minute dedup rule, the excluded non-use day, and the
+95-minute-late dose. The second checks the Python↔JavaScript feature parity fixture, the
+leakage guard, risk-score bounds, and the forecast shape.
 
 ### Viewing the layout without logging in
 
 Open `dashboard/_analytics-preview.html` directly in a browser. It renders the Analytics tab
 against generated data with no Firebase connection. It is a development helper only and is
 safe to delete.
+
+---
+
+## 13. The AI layer (risk radar + 7-day forecast)
+
+The analytics sections above say what **has happened**. This section predicts what is
+**likely to happen next**. It is still a small, explainable layer — not a black box and not a
+diagnosis.
+
+### 13.1 What it predicts
+
+There are two outputs on the Analytics tab:
+
+1. **Next-dose risk.** For every scheduled dose in the next 7 days, the model outputs a
+   probability that the dose will be **missed or taken more than 60 minutes late**.
+   The card groups repeated days into schedule patterns, shows up to three, and explains
+   each in plain language.
+2. **7-day forecast.** The daily taking and timing lines are extended with a dashed
+   projection. It smooths the recent level; it is not recorded data.
+
+The Overview header also shows a compact chip for the next dose, e.g. `Next dose 72% HIGH`.
+The chip hides when the risk card is paused for missing recent data.
+
+### 13.2 How the risk model works, in plain English
+
+1. **Build the features from the past only.** At the moment a dose is due, the model is allowed
+   to know: recent adherence (7/14/30 days), how many doses in a row were missed, the median
+   lateness, days since the last miss, this slot's miss rate, this weekday's miss rate, the
+   previous dose's outcome, and the usual delay for this slot. It is **not** allowed to see the
+   dose it is predicting. That is the golden rule; a leakage test enforces it. Future-dose
+   scores also stop at the last **completed** day, so today's not-yet-recorded doses are never
+   counted as misses.
+2. **Learn weights from labelled history.** Each past dose is labelled non-adherent if it was
+   missed or more than 60 minutes off schedule. A logistic regression learns how the features
+   push that probability up or down.
+3. **Correct the base rate.** Because missed doses are the minority, the learner is told to
+   care about them equally (class weighting), which inflates raw probabilities. The intercept
+   is then adjusted so the average predicted risk matches the observed non-adherence rate.
+4. **Export frozen weights.** Only the final coefficients and scaling constants are copied to
+   `dashboard/ml-model.js`. The browser evaluates a short formula — no Python, no server, no
+   training at demo time.
+
+### 13.3 What the numbers mean
+
+| Display | Meaning |
+|---|---|
+| `Very high` | estimated probability ≥ 90% |
+| `High` | 60–89% |
+| `Medium` | 30–59% |
+| `Low` | below 30% |
+| `72%` | Of past doses with this pattern, roughly 72 in 100 were non-adherent |
+| Reasons under a dose | Plain-language sentences with the underlying values, e.g. "Missed the last 4 doses" |
+
+It is a **prioritisation tool**: the top of the list is where a caregiver should check in
+first. It is not evidence that a specific patient will skip a specific pill, and it does not
+detect ingestion.
+
+**When the card pauses.** If no dose event has been received for 3 days while doses were due,
+the card says **Risk paused** instead of producing a score. A silent box — flat battery,
+Wi-Fi off, or patient not using the system — is missing data, not proof of missed doses.
+Scoring resumes automatically when recent events arrive. This avoids the failure mode where a
+stale device produces 99% risk for every future dose.
+
+### 13.4 How the forecast works
+
+The daily adherence series is noisy — one bad evening can drop a day from 100% to 33%. The
+forecast uses **damped Holt exponential smoothing**: it tracks the current level and a trend,
+but the trend flattens out over the 7-day horizon so it cannot run away. The parameters come
+from a grid search on the training series, and the result is compared against the simplest
+possible baseline ("tomorrow equals today") using a rolling-origin backtest.
+
+On the current synthetic series the forecast's average error is about the same as the naive
+baseline (MAE ≈7.0 percentage points). That is stated openly in the model card: for a stable,
+noisy behaviour series, beating "last value" is hard. The forecast's job in the demo is to
+smooth the recent direction, not to promise precision.
+
+### 13.5 What data trained it
+
+| Source | Used for |
+|---|---|
+| 40 simulated patients × 120 days = 14,400 labelled doses | fitting the weights and the simulated holdout metrics |
+| Real pilot events (3–5 volunteers, 3–4 days) | intercept calibration once ≥20 usable rows exist, plus a separate real evaluation; never used to inflate the simulated numbers |
+
+The simulator encodes behavioural patterns from the literature: weekend effects, evening
+drift, long delays, occasional drug holidays, and persistent differences between patients.
+Those patterns are a **prior**, not proof about real people.
+
+### 13.6 Honest performance
+
+On the simulated temporal holdout (the last 20% of days, never seen in training):
+
+| Model | Accuracy | ROC-AUC |
+|---|---|---|
+| Logistic regression (shipped) | 0.674 | 0.684 |
+| Random forest (benchmark) | 0.634 | 0.689 |
+| Gradient boosting (benchmark) | 0.678 | 0.685 |
+
+Why not higher? The label is random at the individual-dose level by construction, the
+history is short, and the model deliberately avoids clinical covariates. Published per-dose
+models with hundreds of thousands of real events and long histories reach AUC ≈0.84
+(Gu et al., *Sci Rep* 2021), which is the right comparison point — and the reason our model
+card states its limits instead of borrowing that number.
+
+The real pilot is too small for a stable AUC. Once it reaches 20 usable rows it also shifts
+the intercept; below that the simulated prior is kept, and the card reports how many rows
+were found. Real metrics are reported separately whenever there are enough events and both
+outcome classes.
+
+### 13.7 Why logistic regression and not a neural network
+
+- A clinician can read 17 coefficients and the reasons panel; that matters more than a few
+  AUC points in a 4-day project.
+- Small real samples make flexible models unstable; the scoping literature finds logistic
+  regression and random forests among the most frequent top performers.
+- The same model can be evaluated in pure JavaScript with a parity test against Python,
+  removing the train/serve skew that causes silent ML bugs.
+
+### 13.8 How to check it
+
+```bash
+python ml/train_risk.py          # retrain + rewrite model, JS, model card
+node dashboard/ml-risk.test.js   # feature parity, leakage guard, scoring, forecast
+node dashboard/analytics.test.js # existing analytics still correct
+```
+
+The parity test loads a fixture produced by `ml/features.py` and asserts that every feature
+value from the Python builder is reproduced by `dashboard/ml-risk.js` to 1e-9. If the two ever
+drift, the test fails before the dashboard does.
 
 ---
 
@@ -327,6 +466,13 @@ safe to delete.
 | `dashboard/analytics.js` | All the maths. Pure functions — no dashboard, no Firebase. |
 | `dashboard/analytics-ui.js` | Drawing only. Reads results from `analytics.js`. |
 | `dashboard/analytics.test.js` | The 27 verification assertions. |
+| `dashboard/ml-model.js` | Frozen model weights exported by the training script. |
+| `dashboard/ml-risk.js` | Browser inference: risk scores, reasons, 7-day forecast. |
+| `dashboard/ml-risk.test.js` | Parity, leakage, scoring and forecast assertions. |
+| `ml/features.py` | Shared feature definitions and the parity fixture. |
+| `ml/train_risk.py` | Training, calibration, benchmarks and export. |
+| `ml/forecast.py` | Damped Holt fit and rolling-origin backtest. |
+| `ml/model_card.md` | Metrics, data sources and limitations for this model version. |
 | `firmware/SmartMedicineBox/SmartMedicineBox.ino` | Logs which scheduled dose fired, so timing can be measured. |
 | `RESEARCH_BASIS.md` | Formal citations and the full literature survey. |
 

@@ -13,18 +13,18 @@
   var R = global.SmedRisk;
 
   // Two-series categorical palette. NOT the dashboard's --emerald-heal/--amber-caution:
-  // those sit outside the dark-mode OKLCH lightness band (L 0.696 / 0.769 vs the 0.48-0.67
-  // band) and separate by only dE 8.9 under protanopia. These steps pass all six checks
-  // (CVD dE 10.2 deutan, normal-vision dE 28.0, contrast > 3:1 on #121217).
+  // those sit outside the same OKLCH lightness band on the light theme and separate by
+  // only dE 8.9 under protanopia. These steps pass all six checks (CVD dE 10.2 deutan,
+  // normal-vision dE 28.0, contrast > 3:1 on white/#f6f8fb surfaces).
   var COLOR_TAKING = '#0e9f6e';
   var COLOR_TIMING = '#c2410c';
 
-  // Sequential ramp for the heatmap: one hue, dim -> bright. On a dark surface the high
-  // end must be the bright end, or the worst cells disappear into the background.
-  var MISS_RAMP = ['#3f1220', '#7a1a30', '#9f1239', '#e11d48', '#fb7185'];
+  // Sequential ramp for the heatmap: one rose hue, pale -> deep, so on the light page
+  // darker literally means more missed doses (the dark theme used the inverse order).
+  var MISS_RAMP = ['#ffe4e6', '#fecdd3', '#fb7185', '#e11d48', '#9f1239'];
 
-  var GRID_COLOR = 'rgba(255,255,255,0.06)';
-  var TICK_COLOR = '#94a3b8';
+  var GRID_COLOR = 'rgba(15,23,42,0.08)';
+  var TICK_COLOR = '#64748b';
   var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // Cells with fewer than this many prescribed doses are dimmed: 1 miss out of 1 is 100%,
@@ -305,9 +305,8 @@
           node.title = WEEKDAYS[w] + ' ' + h + ':00 — no doses scheduled';
         } else {
           node.style.background = rampColor(cell.rate);
-          // Text sits on a coloured mark, so it uses a fixed high-contrast ink rather
-          // than a series colour.
-          node.style.color = cell.rate > 55 ? '#fff5f7' : '#fecdd3';
+          // Deep ramp cells get light ink; pale cells get dark ink.
+          node.style.color = cell.rate > 60 ? '#fff5f7' : '#7a1a30';
           node.textContent = Math.round(cell.rate) + '%';
           if (cell.total < SPARSE_THRESHOLD) node.className += ' sparse';
           node.title = WEEKDAYS[w] + ' ' + h + ':00 — ' + cell.missed + ' missed of ' +

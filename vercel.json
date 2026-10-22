@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "dashboard",
+  "installCommand": "exit 0",
+  "buildCommand": "exit 0",
+  "regions": ["bom1"],
+  "functions": { "api/groq.js": { "maxDuration": 60 } }
+}

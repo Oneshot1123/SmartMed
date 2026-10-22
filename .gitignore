@@ -10,3 +10,6 @@ firmware/**/secrets.h
 
 # Pilot data contains volunteer event logs — never commit it
 ml/data/real_data.json
+
+.vercel
+.env*

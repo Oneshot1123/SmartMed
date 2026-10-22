@@ -213,7 +213,7 @@ function renderPatientsGrid(patients) {
         const isActive = uid === patientID;
         const displayName = data.name || 'Unnamed person';
         const initials = displayName.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
-        const borderStyle = isActive ? 'border: 2px solid var(--emerald-glow); padding: 1.4rem;' : 'border: 1px solid var(--surface-border); padding: 1.5rem;';
+        const borderStyle = isActive ? 'border: 2px solid var(--emerald-heal); padding: 1.4rem;' : 'border: 1px solid var(--surface-border); padding: 1.5rem;';
         
         const card = document.createElement('div');
         card.className = `card span-2`;
@@ -226,7 +226,7 @@ function renderPatientsGrid(patients) {
                     ${initials}
                 </div>
                 <div style="flex:1; min-width:200px;">
-                    <h2 style="font-family:'Outfit'; font-size:1.35rem; margin-bottom:0.35rem; color:${isActive ? 'var(--emerald-heal)' : 'white'};">${displayName} ${isActive ? '<span class="active-tag">Selected</span>' : ''}</h2>
+                    <h2 style="font-family:'Outfit'; font-size:1.35rem; margin-bottom:0.35rem; color:${isActive ? 'var(--emerald-heal)' : 'var(--text-primary)'};">${displayName} ${isActive ? '<span class="active-tag">Selected</span>' : ''}</h2>
                     <div style="display:flex; gap:1.25rem; flex-wrap:wrap;">
                         <div><span class="vital-label">AGE</span><span style="font-weight:700;">${data.age || '--'}</span></div>
                         <div><span class="vital-label">CONDITION</span><span style="font-weight:700;">${data.condition || '--'}</span></div>
@@ -1106,7 +1106,7 @@ function showToast(message, isError = false) {
     if (!container) return;
     
     const toast = document.createElement('div');
-    toast.style.cssText = `background: ${isError ? 'var(--rose-alert)' : 'var(--bg-primary)'}; color: white; padding: 15px 20px; border-radius: 8px; border-left: 4px solid ${isError ? 'red' : 'var(--emerald-heal)'}; box-shadow: 0 4px 15px rgba(0,0,0,0.3); font-size: 0.9rem; animation: slideInX 0.3s ease forwards;`;
+    toast.style.cssText = `background: ${isError ? 'var(--rose-alert)' : 'var(--surface)'}; color: ${isError ? 'white' : 'var(--text-primary)'}; padding: 15px 20px; border-radius: 8px; border-left: 4px solid ${isError ? 'var(--rose-alert)' : 'var(--emerald-heal)'}; box-shadow: 0 8px 24px rgba(15,23,42,0.18); font-size: 0.9rem; animation: slideInX 0.3s ease forwards;`;
     toast.textContent = message;
     
     container.appendChild(toast);

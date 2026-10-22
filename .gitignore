@@ -13,3 +13,9 @@ ml/data/real_data.json
 
 .vercel
 .env*
+
+# Agent / browser-session artifacts - not part of the project
+.agent/
+.opencode/
+.playwright-mcp/
+

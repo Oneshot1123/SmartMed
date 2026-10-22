@@ -5,5 +5,8 @@ __pycache__/
 # Secrets — never commit
 .env
 
+# Firmware credentials - never commit
+firmware/**/secrets.h
+
 # Pilot data contains volunteer event logs — never commit it
 ml/data/real_data.json

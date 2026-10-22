@@ -19,12 +19,10 @@ RTC_DS3231 rtc;
 const int ir1Pin = 32, ir2Pin = 16, ir3Pin = 17, buzzerPin = 13;
 const int greenLed = 18, yellowLed = 19, redLed = 23;
 
-#define WIFI_SSID "Jaineel"
-#define WIFI_PASSWORD "12345678"
-#define API_KEY "AIzaSyDzGt90UApRGj30sj7tNqCAbsfZO2g6358"
-#define DATABASE_URL "https://smartmed-grp27-default-rtdb.asia-southeast1.firebasedatabase.app"
-#define USER_EMAIL "dr@example.com"
-#define USER_PASSWORD "password123"
+#include "secrets.h"
+#if !defined(WIFI_SSID) || !defined(WIFI_PASSWORD) || !defined(API_KEY) || !defined(DATABASE_URL) || !defined(USER_EMAIL) || !defined(USER_PASSWORD)
+  #error "Missing secrets.h - copy secrets.example.h to secrets.h and fill it in."
+#endif
 
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 19800; // India

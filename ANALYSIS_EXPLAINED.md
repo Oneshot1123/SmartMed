@@ -325,9 +325,9 @@ leakage guard, risk-score bounds, and the forecast shape.
 
 ### Viewing the layout without logging in
 
-Open `dashboard/_analytics-preview.html` directly in a browser. It renders the Analytics tab
-against generated data with no Firebase connection. It is a development helper only and is
-safe to delete.
+Sign in and use **More > Device & settings > Developer tools > Create / refresh demo patient**.
+It builds a demo patient with 60 days of dose events against the real backend, no manual
+wiring needed.
 
 ---
 

@@ -452,14 +452,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-  <script>
-    // Dev hook: add ?stub=1 to use the local Firebase stub instead of the real backend
-    // (any email/password signs in). See .opencode/firebase-stub.js for the patient data.
-    // Must load AFTER the real SDK: it overwrites window.firebase before app.js runs.
-    if (new URLSearchParams(location.search).has('stub')) {
-      document.write('<script src="/.opencode/firebase-stub.js"><\/script>');
-    }
-  </script>
   <!-- Pure computation, then the rendering layer that consumes it -->
   <script src="analytics.js"></script>
   <script src="ml-model.js"></script>

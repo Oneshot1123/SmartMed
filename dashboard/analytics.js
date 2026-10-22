@@ -393,6 +393,13 @@
     return clean.reduce(function (a, b) { return a + b; }, 0) / clean.length;
   }
 
+  function median(values) {
+    if (!values.length) return null;
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
   // --- Pattern analysis: miss rate by hour of day x weekday -----------------------------
 
   /*
@@ -461,10 +468,9 @@
     if (!deltas.length) return { count: 0, median: null, earliest: null, latest: null };
 
     var sorted = deltas.slice().sort(function (a, b) { return a - b; });
-    var mid = Math.floor(sorted.length / 2);
     return {
       count: sorted.length,
-      median: sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2,
+      median: median(deltas),
       earliest: sorted[0],
       latest: sorted[sorted.length - 1]
     };
@@ -562,6 +568,8 @@
     addDays: addDays,
     timeToMinutes: timeToMinutes,
     minutesToTime: minutesToTime,
+    mean: mean,
+    median: median,
     TIMING_WINDOW_MIN: TIMING_WINDOW_MIN,
     DEDUP_WINDOW_MIN: DEDUP_WINDOW_MIN,
     ADHERENCE_THRESHOLD: ADHERENCE_THRESHOLD

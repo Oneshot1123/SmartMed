@@ -477,14 +477,7 @@
   }
 
   function clockLabel(value) {
-    if (!value) return 'this dose';
-    var parts = String(value).split(':');
-    var h = Number(parts[0]);
-    var m = Number(parts[1]);
-    if (isNaN(h) || isNaN(m)) return value;
-    var d = new Date();
-    d.setHours(h, m, 0, 0);
-    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return value ? formatTimeString(value) : 'this dose';
   }
 
   function riskAction(dose) {
@@ -566,9 +559,7 @@
     var counts = { high: 0, medium: 0, low: 0 };
     doses.forEach(function (d) { counts[d.level]++; });
 
-    var grouped = R.groupUpcoming
-      ? R.groupUpcoming(doses, 3)
-      : { groups: result.top || [], total: (result.top || []).length, doses: doses.length };
+    var grouped = R.groupUpcoming(doses, 3);
     var shown = grouped.groups;
 
     if (headline) {

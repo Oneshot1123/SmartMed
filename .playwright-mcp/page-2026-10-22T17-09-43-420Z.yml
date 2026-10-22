@@ -1,0 +1,117 @@
+- generic [ref=f3e17]:
+  - complementary [ref=f3e18]:
+    - navigation "Main navigation" [ref=f3e25]:
+      - link "Today" [ref=f3e26] [cursor=pointer]:
+        - /url: "#"
+      - link "Medicines" [ref=f3e32] [cursor=pointer]:
+        - /url: "#"
+      - link "History" [ref=f3e35] [cursor=pointer]:
+        - /url: "#"
+      - link "More" [ref=f3e39] [cursor=pointer]:
+        - /url: "#"
+  - main [ref=f3e48]:
+    - generic [ref=f3e197]:
+      - generic [ref=f3e198]:
+        - generic [ref=f3e199]:
+          - heading "Reports" [level=1] [ref=f3e200]
+          - paragraph [ref=f3e201]: Implementation-phase adherence, 2026-09-23 to 2026-10-22
+        - generic [ref=f3e202]:
+          - group "Observation window" [ref=f3e203]:
+            - button "7d" [ref=f3e204] [cursor=pointer]
+            - button "30d" [ref=f3e205] [cursor=pointer]
+            - button "90d" [ref=f3e206] [cursor=pointer]
+          - button "Export CSV" [ref=f3e207] [cursor=pointer]
+      - generic [ref=f3e208]:
+        - generic [ref=f3e209]: This window includes 135 simulated events seeded from the Sim-Suite. Clear them before reporting real adherence.
+        - generic [ref=f3e210]:
+          - generic [ref=f3e211]: Doses taken
+          - generic [ref=f3e212]: 86.7%
+          - generic [ref=f3e213]: 78 of 90 doses
+          - paragraph [ref=f3e214]: Doses taken ÷ doses prescribed
+        - generic [ref=f3e215]:
+          - generic [ref=f3e216]: Taken on time
+          - generic [ref=f3e217]: 86.7%
+          - generic [ref=f3e218]: 78 of 90 doses
+          - paragraph [ref=f3e219]: Within 60 minutes of the scheduled time
+        - generic [ref=f3e220]:
+          - generic [ref=f3e221]: Days with all doses
+          - generic [ref=f3e222]: 66.7%
+          - generic [ref=f3e223]: 20 of 30 days
+          - paragraph [ref=f3e224]: Days where every scheduled dose was taken
+        - generic [ref=f3e226]:
+          - generic [ref=f3e227]:
+            - heading "Daily doses" [level=2] [ref=f3e228]
+            - paragraph [ref=f3e229]: Each point is one day. The two lines show doses taken and doses taken on time. The dashed line is an estimate from the last 7 days, not recorded data.
+          - generic [ref=f3e230]:
+            - generic [ref=f3e231]: Doses taken
+            - generic [ref=f3e233]: On time
+            - generic [ref=f3e235]: Expected
+            - generic [ref=f3e237]: Expected on time
+            - generic [ref=f3e239]: 80% target
+        - generic [ref=f3e243]:
+          - heading "When doses are missed" [level=2] [ref=f3e244]
+          - paragraph [ref=f3e245]: Darker means more missed doses. Lighter cells have fewer records.
+          - generic [ref=f3e362]:
+            - generic [ref=f3e364]: 08:00
+            - generic [ref=f3e365]: 14:00
+            - generic [ref=f3e366]: 20:00
+            - generic [ref=f3e367]: Sun
+            - generic "Sun 8:00 — 0 missed of 4 prescribed (0%)" [ref=f3e368]: 0%
+            - generic "Sun 14:00 — 0 missed of 4 prescribed (0%)" [ref=f3e369]: 0%
+            - generic "Sun 20:00 — 1 missed of 4 prescribed (25%)" [ref=f3e370]: 25%
+            - generic [ref=f3e371]: Mon
+            - generic "Mon 8:00 — 0 missed of 4 prescribed (0%)" [ref=f3e372]: 0%
+            - generic "Mon 14:00 — 0 missed of 4 prescribed (0%)" [ref=f3e373]: 0%
+            - generic "Mon 20:00 — 1 missed of 4 prescribed (25%)" [ref=f3e374]: 25%
+            - generic [ref=f3e375]: Tue
+            - generic "Tue 8:00 — 1 missed of 4 prescribed (25%)" [ref=f3e376]: 25%
+            - generic "Tue 14:00 — 0 missed of 4 prescribed (0%)" [ref=f3e377]: 0%
+            - generic "Tue 20:00 — 2 missed of 4 prescribed (50%)" [ref=f3e378]: 50%
+            - generic [ref=f3e379]: Wed
+            - generic "Wed 8:00 — 0 missed of 5 prescribed (0%)" [ref=f3e380]: 0%
+            - generic "Wed 14:00 — 0 missed of 5 prescribed (0%)" [ref=f3e381]: 0%
+            - generic "Wed 20:00 — 1 missed of 5 prescribed (20%)" [ref=f3e382]: 20%
+            - generic [ref=f3e383]: Thu
+            - generic "Thu 8:00 — 0 missed of 5 prescribed (0%)" [ref=f3e384]: 0%
+            - generic "Thu 14:00 — 1 missed of 5 prescribed (20%)" [ref=f3e385]: 20%
+            - generic "Thu 20:00 — 0 missed of 5 prescribed (0%)" [ref=f3e386]: 0%
+            - generic [ref=f3e387]: Fri
+            - generic "Fri 8:00 — 0 missed of 4 prescribed (0%)" [ref=f3e388]: 0%
+            - generic "Fri 14:00 — 1 missed of 4 prescribed (25%)" [ref=f3e389]: 25%
+            - generic "Fri 20:00 — 0 missed of 4 prescribed (0%)" [ref=f3e390]: 0%
+            - generic [ref=f3e391]: Sat
+            - generic "Sat 8:00 — 2 missed of 4 prescribed (50%)" [ref=f3e392]: 50%
+            - generic "Sat 14:00 — 0 missed of 4 prescribed (0%)" [ref=f3e393]: 0%
+            - generic "Sat 20:00 — 2 missed of 4 prescribed (50%)" [ref=f3e394]: 50%
+          - generic [ref=f3e280]:
+            - generic [ref=f3e281]: 0%
+            - generic [ref=f3e283]: 100% missed
+        - generic [ref=f3e284]:
+          - heading "Numbers behind this report" [level=2] [ref=f3e285]
+          - generic [ref=f3e286]:
+            - generic [ref=f3e395]:
+              - term [ref=f3e396]: Days observed
+              - definition [ref=f3e397]: "30"
+            - generic [ref=f3e398]:
+              - term [ref=f3e399]: Doses prescribed
+              - definition [ref=f3e400]: "90"
+            - generic [ref=f3e401]:
+              - term [ref=f3e402]: Doses taken
+              - definition [ref=f3e403]: "78"
+            - generic [ref=f3e404]:
+              - term [ref=f3e405]: Doses missed
+              - definition [ref=f3e406]: "12"
+            - generic [ref=f3e407]:
+              - term [ref=f3e408]: Median lateness
+              - definition [ref=f3e409]: 15 min late
+            - generic [ref=f3e410]:
+              - term [ref=f3e411]: Latest dose
+              - definition [ref=f3e412]: 38 min late
+            - generic [ref=f3e413]:
+              - term [ref=f3e414]: Repeat actuations removed
+              - definition [ref=f3e415]: "0"
+            - generic [ref=f3e416]:
+              - term [ref=f3e417]: Days excluded (non-use)
+              - definition [ref=f3e418]: "0"
+        - group [ref=f3e312]:
+          - generic "▸ Methods and definitions How every number above is calculated" [ref=f3e313] [cursor=pointer]

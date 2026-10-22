@@ -1,0 +1,140 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e17]:
+    - complementary [ref=f1e18]:
+      - generic [ref=f1e19]:
+        - heading "SmartMed" [level=2] [ref=f1e24]
+        - navigation "Main navigation" [ref=f1e25]:
+          - link "Today" [ref=f1e26] [cursor=pointer]:
+            - /url: "#"
+          - link "Medicines" [ref=f1e32] [cursor=pointer]:
+            - /url: "#"
+          - link "History" [ref=f1e35] [cursor=pointer]:
+            - /url: "#"
+          - link "More" [ref=f1e39] [cursor=pointer]:
+            - /url: "#"
+      - button "Sign out" [ref=f1e44] [cursor=pointer]
+    - main [ref=f1e48]:
+      - generic [ref=f1e49]:
+        - generic [ref=f1e50]:
+          - generic [ref=f1e51]:
+            - heading "Today" [level=1] [ref=f1e52]
+            - paragraph [ref=f1e53]: A simple view of Robert Kumar's medicines and box.
+          - generic [ref=f1e54]:
+            - generic [ref=f1e55]: Person you care for
+            - combobox "Person you care for" [ref=f1e56]:
+              - option "Robert Kumar" [selected]
+        - generic [ref=f1e57]:
+          - generic [ref=f1e58]:
+            - generic [ref=f1e59]:
+              - generic [ref=f1e60]:
+                - heading "Next dose" [level=2] [ref=f1e61]
+                - paragraph [ref=f1e62]: The next medicine due from the box today.
+              - generic [ref=f1e63]: Box connected
+            - generic [ref=f1e64]:
+              - generic [ref=f1e65]: 9:30 AM
+              - generic [ref=f1e66]: Metformin
+              - paragraph [ref=f1e67]: Box slot 1
+            - generic [ref=f1e68]:
+              - generic [ref=f1e69]:
+                - generic [ref=f1e70]: Taken today
+                - strong [ref=f1e71]: "0"
+              - generic [ref=f1e72]:
+                - generic [ref=f1e73]: No record
+                - strong [ref=f1e74]: "0"
+              - generic [ref=f1e75]:
+                - generic [ref=f1e76]: Later today
+                - strong [ref=f1e77]: "3"
+            - generic [ref=f1e78]:
+              - generic [ref=f1e79]:
+                - generic [ref=f1e80]: 9:30 AM
+                - generic [ref=f1e81]: Metformin · slot 1
+                - generic [ref=f1e82]: Later
+              - generic [ref=f1e83]:
+                - generic [ref=f1e84]: 3:45 PM
+                - generic [ref=f1e85]: Ramipril · slot 2
+                - generic [ref=f1e86]: Later
+              - generic [ref=f1e87]:
+                - generic [ref=f1e88]: 9:00 PM
+                - generic [ref=f1e89]: Amlodipine · slot 3
+                - generic [ref=f1e90]: Later
+            - paragraph [ref=f1e91]: Box last updated Thu, Oct 22, 9:30 PM
+          - generic [ref=f1e92]:
+            - heading "This week" [level=2] [ref=f1e93]
+            - generic [ref=f1e94]: 67%
+            - paragraph [ref=f1e95]: of scheduled doses taken this week
+            - paragraph [ref=f1e98]: 12 taken · 6 no record
+          - generic [ref=f1e99]:
+            - generic [ref=f1e101]:
+              - heading "What to watch" [level=2] [ref=f1e102]
+              - paragraph [ref=f1e103]: A heads-up about the next 7 days, based on the last 30 days of doses. This is not a diagnosis.
+            - paragraph [ref=f1e104]: Nothing urgent. 8 doses are worth watching.
+            - generic [ref=f1e105]:
+              - generic [ref=f1e106]:
+                - generic [ref=f1e107]:
+                  - strong [ref=f1e108]: 9:00 PM
+                  - generic [ref=f1e109]: On 7 days
+                - generic [ref=f1e110]:
+                  - generic [ref=f1e111]:
+                    - generic [ref=f1e112]: Amlodipine · box slot 3
+                    - generic [ref=f1e113]: Medium chance
+                  - generic [ref=f1e116]: Weekend doses need extra attention · Only 71% taken in the last 7 days
+                  - generic [ref=f1e117]: Plan the weekend dose ahead — a reminder or a check-in can help.
+              - generic [ref=f1e118]:
+                - generic [ref=f1e119]:
+                  - strong [ref=f1e120]: 3:45 PM
+                  - generic [ref=f1e121]: On 7 days
+                - generic [ref=f1e122]:
+                  - generic [ref=f1e123]:
+                    - generic [ref=f1e124]: Ramipril · box slot 2
+                    - generic [ref=f1e125]: Medium chance
+                  - generic [ref=f1e128]: Weekend doses need extra attention · Only 79% taken in the last 30 days
+                  - generic [ref=f1e129]: Plan the weekend dose ahead — a reminder or a check-in can help.
+              - generic [ref=f1e130]:
+                - generic [ref=f1e131]:
+                  - strong [ref=f1e132]: 9:30 AM
+                  - generic [ref=f1e133]: On 7 days
+                - generic [ref=f1e134]:
+                  - generic [ref=f1e135]:
+                    - generic [ref=f1e136]: Metformin · box slot 1
+                    - generic [ref=f1e137]: Low chance
+                  - generic [ref=f1e140]: Recent pattern for this dose looks steady.
+                  - generic [ref=f1e141]: No action needed. Keep the current routine.
+            - group [ref=f1e142]:
+              - generic "How this is calculated" [ref=f1e143] [cursor=pointer]
+            - button "Explain in simple words" [ref=f1e145] [cursor=pointer]
+          - generic [ref=f1e146]:
+            - generic [ref=f1e147]:
+              - heading "Recent doses" [level=2] [ref=f1e148]
+              - link "See all" [ref=f1e149] [cursor=pointer]:
+                - /url: "#"
+            - table [ref=f1e151]:
+              - rowgroup [ref=f1e152]:
+                - row [ref=f1e153]:
+                  - columnheader "TIME" [ref=f1e154]
+                  - columnheader "MEDICINE" [ref=f1e155]
+                  - columnheader "RESULT" [ref=f1e156]
+              - rowgroup [ref=f1e157]:
+                - row [ref=f1e158]:
+                  - cell "9:30 PM" [ref=f1e159]
+                  - cell "Amlodipine" [ref=f1e160]
+                  - cell "Taken" [ref=f1e161]
+                - row [ref=f1e163]:
+                  - cell "3:55 PM" [ref=f1e164]
+                  - cell "Ramipril" [ref=f1e165]
+                  - cell "Taken" [ref=f1e166]
+                - row [ref=f1e168]:
+                  - cell "9:31 AM" [ref=f1e169]
+                  - cell "Metformin" [ref=f1e170]
+                  - cell "Missed" [ref=f1e171]
+                - row [ref=f1e173]:
+                  - cell "3:51 PM" [ref=f1e174]
+                  - cell "Ramipril" [ref=f1e175]
+                  - cell "Taken" [ref=f1e176]
+                - row [ref=f1e178]:
+                  - cell "9:43 AM" [ref=f1e179]
+                  - cell "Metformin" [ref=f1e180]
+                  - cell "Taken" [ref=f1e181]
+      - text: ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸
+  - generic [ref=f1e183]:
+    - generic [ref=f1e184]: Showing Robert Kumar
+    - generic [ref=f1e185]: Authentication Successful

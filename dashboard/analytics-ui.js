@@ -111,7 +111,7 @@
 
     var datasets = [
       {
-        label: 'Taking',
+        label: 'Doses taken',
         data: takingData,
         borderColor: COLOR_TAKING,
         backgroundColor: COLOR_TAKING,
@@ -121,7 +121,7 @@
         tension: 0.25
       },
       {
-        label: 'Timing',
+        label: 'On time',
         data: timingData,
         borderColor: COLOR_TIMING,
         backgroundColor: COLOR_TIMING,
@@ -145,7 +145,7 @@
       padTiming[rows.length - 1] = timingData[timingData.length - 1];
 
       datasets.push({
-        label: 'Taking forecast',
+        label: 'Expected',
         data: padTaking.concat(forecast.projectedTaking),
         borderColor: COLOR_TAKING,
         backgroundColor: COLOR_TAKING,
@@ -156,7 +156,7 @@
         tension: 0.25
       });
       datasets.push({
-        label: 'Timing forecast',
+        label: 'Expected on time',
         data: padTiming.concat(forecast.projectedTiming),
         borderColor: COLOR_TIMING,
         backgroundColor: COLOR_TIMING,
@@ -170,9 +170,9 @@
 
     var caption = el('trend-caption');
     if (caption) {
-      var base = 'Each point is one day. The gap between the two lines is time-of-day drift.';
+      var base = 'Each point is one day. The two lines show doses taken and doses taken on time.';
       caption.textContent = forecast
-        ? base + ' The dashed tail is a 7-day Holt projection (not recorded data).'
+        ? base + ' The dashed line is an estimate from the last 7 days, not recorded data.'
         : base;
     }
 
@@ -445,9 +445,8 @@
       var grid = section.querySelector('.grid');
       grid.insertBefore(existing, grid.firstChild);
     }
-    existing.textContent = 'This window includes ' + count +
-      ' simulated event' + (count === 1 ? '' : 's') +
-      ' seeded from the Sim-Suite. Clear them before reporting real adherence.';
+    existing.textContent = 'This report includes ' + count + ' test event' +
+      (count === 1 ? '' : 's') + '. Clear them before relying on these numbers.';
   }
 
   // --- ML risk radar --------------------------------------------------------------
@@ -458,24 +457,50 @@
     });
   }
 
-  var NO_UPCOMING_TEXT = 'No upcoming doses in the next 7 days. Deploy a regimen in the Scheduler to see risk scores.';
+  var NO_UPCOMING_TEXT = 'No doses scheduled yet. Add the first medicine to start.';
 
   function riskWarningText(warning) {
     if (warning.type === 'none') {
-      return 'Risk paused — no dose events recorded yet for this schedule. ' +
+      return 'Risk paused — no dose has been recorded yet. ' +
         'Log the first dose to start scoring.';
     }
     var when = warning.lastEvent ? riskDateLabel(warning.lastEvent) : 'recently';
     var ago = warning.daysSince != null ? ' (' + warning.daysSince + ' days ago)' : '';
-    return 'Risk paused — no dose event recorded since ' + when + ago + '. ' +
-      'Check that the box is powered on and the patient is using it.';
+    return 'Risk paused — the box has not sent a dose update since ' + when + ago + '. ' +
+      'Check that it is powered on and connected. Scores return when new doses arrive.';
   }
 
   function probabilityBand(probability) {
-    if (probability >= 0.9) return 'Very high';
-    if (probability >= 0.6) return 'High';
-    if (probability >= 0.3) return 'Medium';
-    return 'Low';
+    if (probability >= 0.9) return 'Very high chance';
+    if (probability >= 0.6) return 'High chance';
+    if (probability >= 0.3) return 'Medium chance';
+    return 'Low chance';
+  }
+
+  function clockLabel(value) {
+    if (!value) return 'this dose';
+    var parts = String(value).split(':');
+    var h = Number(parts[0]);
+    var m = Number(parts[1]);
+    if (isNaN(h) || isNaN(m)) return value;
+    var d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function riskAction(dose) {
+    if (dose.level === 'low') return 'No action needed. Keep the current routine.';
+    var f = dose.features || {};
+    if (f.is_weekend >= 0.5) {
+      return 'Plan the weekend dose ahead — a reminder or a check-in can help.';
+    }
+    if (f.slot_miss_rate_14d >= 50) {
+      return 'Set a reminder shortly before ' + clockLabel(dose.time) + '.';
+    }
+    if (typeof f.roll7_taking === 'number' && f.roll7_taking < 80) {
+      return 'Check in before this dose this week.';
+    }
+    return 'A reminder before this dose can help.';
   }
 
   function renderRisk() {
@@ -553,37 +578,23 @@
       var level;
       if (counts.high === total) {
         text = total === 1
-          ? 'The next dose is high risk.'
-          : 'All ' + total + ' upcoming doses are high risk.';
+          ? 'The next dose needs extra attention.'
+          : 'All ' + total + ' doses in the next 7 days need extra attention.';
         level = 'high';
       } else if (counts.high) {
-        text = counts.high + ' of ' + total + ' upcoming doses ' +
-          (counts.high === 1 ? 'is' : 'are') + ' high risk.';
+        text = counts.high + ' of ' + total + ' doses in the next 7 days need extra attention.';
         level = 'high';
       } else if (counts.medium) {
-        text = 'No high-risk doses; ' + counts.medium + ' medium-risk ' +
-          (counts.medium === 1 ? 'dose' : 'doses') + ' to watch.';
+        text = 'Nothing urgent. ' + counts.medium + ' ' +
+          (counts.medium === 1 ? 'dose is' : 'doses are') + ' worth watching.';
         level = 'medium';
       } else {
-        text = 'No elevated risk in the next 7 days.';
+        text = 'Nothing needs attention in the next 7 days.';
         level = 'low';
       }
       headline.textContent = text;
       headline.className = 'risk-headline ' + level;
       headline.style.display = 'block';
-    }
-
-    if (summary) {
-      ['high', 'medium', 'low'].forEach(function (level) {
-        if (!counts[level]) return;
-        var pill = document.createElement('div');
-        pill.className = 'risk-pill ' + level;
-        var value = document.createElement('strong');
-        value.textContent = counts[level];
-        pill.appendChild(value);
-        pill.appendChild(document.createTextNode(level.charAt(0).toUpperCase() + level.slice(1)));
-        summary.appendChild(pill);
-      });
     }
 
     shown.forEach(function (dose) {
@@ -593,10 +604,10 @@
       var when = document.createElement('div');
       when.className = 'risk-when';
       var time = document.createElement('strong');
-      time.textContent = dose.time;
+      time.textContent = clockLabel(dose.time);
       var date = document.createElement('span');
       date.textContent = dose.count > 1
-        ? 'Every day · ' + dose.count + ' doses'
+        ? 'On ' + dose.count + ' days'
         : riskDateLabel(dose.exampleDate || dose.date);
       when.appendChild(time);
       when.appendChild(date);
@@ -608,7 +619,7 @@
       line.className = 'risk-line';
       var name = document.createElement('span');
       name.className = 'risk-name';
-      name.textContent = (dose.medName || 'Medication') + ' · Comp ' + dose.compartment;
+      name.textContent = (dose.medName || 'Medicine') + ' · box slot ' + (dose.compartment || '1');
       var probability = document.createElement('span');
       probability.className = 'risk-prob';
       var band = document.createElement('span');
@@ -629,13 +640,18 @@
 
       var reasons = document.createElement('div');
       reasons.className = 'risk-reasons';
-      reasons.textContent = R.explainRisk
-        ? R.explainRisk(dose)
-        : 'Based on the recent dose pattern.';
+      reasons.textContent = dose.level === 'low'
+        ? 'Recent pattern for this dose looks steady.'
+        : (R.explainRisk ? R.explainRisk(dose) : 'Based on the recent dose pattern.');
+
+      var action = document.createElement('div');
+      action.className = 'risk-action';
+      action.textContent = riskAction(dose);
 
       body.appendChild(line);
       body.appendChild(bar);
       body.appendChild(reasons);
+      body.appendChild(action);
       item.appendChild(when);
       item.appendChild(body);
       list.appendChild(item);
@@ -673,8 +689,8 @@
 
     var subtitle = el('analytics-subtitle');
     if (subtitle) {
-      subtitle.textContent = 'Implementation-phase adherence, ' +
-        result.window.from + ' to ' + result.window.to;
+      subtitle.textContent = 'Dose patterns from ' +
+        result.window.from + ' to ' + result.window.to + '.';
     }
 
     renderSimBanner(state.history);

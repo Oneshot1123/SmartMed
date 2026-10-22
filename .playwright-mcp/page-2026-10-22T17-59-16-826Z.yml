@@ -1,0 +1,140 @@
+- generic [ref=e2]:
+  - complementary [ref=e3]:
+    - generic [ref=e4]:
+      - heading "SmartMed" [level=2] [ref=e9]
+      - navigation "Main navigation" [ref=e10]:
+        - link "Today" [ref=e11] [cursor=pointer]:
+          - /url: "#"
+        - link "Medicines" [ref=e17] [cursor=pointer]:
+          - /url: "#"
+        - link "History" [ref=e20] [cursor=pointer]:
+          - /url: "#"
+        - link "More" [ref=e24] [cursor=pointer]:
+          - /url: "#"
+    - button "Sign out" [ref=e29] [cursor=pointer]
+  - main [ref=e33]:
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - heading "Today" [level=1] [ref=e37]
+          - paragraph [ref=e38]: A simple view of Demo Patient's medicines and box.
+        - generic [ref=e39]:
+          - generic [ref=e40]: Person you care for
+          - combobox "Person you care for" [ref=e41]:
+            - option "Demo Patient" [selected]
+            - option "Stale Patient"
+            - option "New Patient"
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic [ref=e45]:
+              - heading "Next dose" [level=2] [ref=e46]
+              - paragraph [ref=e47]: The next medicine due from the box today.
+            - generic [ref=e48]: Box connected
+          - generic [ref=e49]:
+            - generic [ref=e50]: Done for today
+            - generic [ref=e51]: All doses for today have passed.
+            - paragraph
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - generic [ref=e54]: Taken today
+              - strong [ref=e55]: "2"
+            - generic [ref=e56]:
+              - generic [ref=e57]: No record
+              - strong [ref=e58]: "1"
+            - generic [ref=e59]:
+              - generic [ref=e60]: Later today
+              - strong [ref=e61]: "0"
+          - generic [ref=e62]:
+            - generic [ref=e63]:
+              - generic [ref=e64]: 8:00 AM
+              - generic [ref=e65]: Metformin · slot 1
+              - generic [ref=e66]: Taken
+            - generic [ref=e67]:
+              - generic [ref=e68]: 2:00 PM
+              - generic [ref=e69]: Amlodipine · slot 2
+              - generic [ref=e70]: No record
+            - generic [ref=e71]:
+              - generic [ref=e72]: 8:30 PM
+              - generic [ref=e73]: Atorvastatin · slot 3
+              - generic [ref=e74]: Taken
+          - paragraph [ref=e75]: Box last updated Thu, Oct 22, 9:06 PM
+        - generic [ref=e76]:
+          - heading "This week" [level=2] [ref=e77]
+          - generic [ref=e78]: 86%
+          - paragraph [ref=e79]: of scheduled doses taken this week
+          - paragraph [ref=e82]: 18 taken · 3 no record
+        - generic [ref=e83]:
+          - generic [ref=e85]:
+            - heading "What to watch" [level=2] [ref=e86]
+            - paragraph [ref=e87]: A heads-up about the next 7 days, based on the last 30 days of doses. This is not a diagnosis.
+          - paragraph [ref=e88]: Nothing urgent. 6 doses are worth watching.
+          - generic [ref=e89]:
+            - generic [ref=e90]:
+              - generic [ref=e91]:
+                - strong [ref=e92]: 8:30 PM
+                - generic [ref=e93]: On 6 days
+              - generic [ref=e94]:
+                - generic [ref=e95]:
+                  - generic [ref=e96]: Atorvastatin · box slot 3
+                  - generic [ref=e97]: Medium chance
+                - generic [ref=e100]: Based on the recent dose pattern.
+                - generic [ref=e101]: Plan the weekend dose ahead — a reminder or a check-in can help.
+            - generic [ref=e102]:
+              - generic [ref=e103]:
+                - strong [ref=e104]: 2:00 PM
+                - generic [ref=e105]: On 6 days
+              - generic [ref=e106]:
+                - generic [ref=e107]:
+                  - generic [ref=e108]: Amlodipine · box slot 2
+                  - generic [ref=e109]: Low chance
+                - generic [ref=e112]: Recent pattern for this dose looks steady.
+                - generic [ref=e113]: No action needed. Keep the current routine.
+            - generic [ref=e114]:
+              - generic [ref=e115]:
+                - strong [ref=e116]: 8:00 AM
+                - generic [ref=e117]: On 6 days
+              - generic [ref=e118]:
+                - generic [ref=e119]:
+                  - generic [ref=e120]: Metformin · box slot 1
+                  - generic [ref=e121]: Low chance
+                - generic [ref=e124]: Recent pattern for this dose looks steady.
+                - generic [ref=e125]: No action needed. Keep the current routine.
+          - group [ref=e126]:
+            - generic "How this is calculated" [ref=e127] [cursor=pointer]
+          - generic [ref=e128]:
+            - button "Explain again" [ref=e170] [cursor=pointer]
+            - paragraph [ref=e171]: "STUB [llama-3.1-8b-instant] Patient: Demo Patient | payload chars=794"
+        - generic [ref=e130]:
+          - generic [ref=e131]:
+            - heading "Recent doses" [level=2] [ref=e132]
+            - link "See all" [ref=e133] [cursor=pointer]:
+              - /url: "#"
+          - table [ref=e135]:
+            - rowgroup [ref=e136]:
+              - row [ref=e137]:
+                - columnheader "TIME" [ref=e138]
+                - columnheader "MEDICINE" [ref=e139]
+                - columnheader "RESULT" [ref=e140]
+            - rowgroup [ref=e141]:
+              - row [ref=e142]:
+                - cell "9:06 PM" [ref=e143]
+                - cell "Atorvastatin" [ref=e144]
+                - cell "Taken" [ref=e145]
+              - row [ref=e147]:
+                - cell "2:01 PM" [ref=e148]
+                - cell "Amlodipine" [ref=e149]
+                - cell "Missed" [ref=e150]
+              - row [ref=e152]:
+                - cell "8:11 AM" [ref=e153]
+                - cell "Metformin" [ref=e154]
+                - cell "Taken" [ref=e155]
+              - row [ref=e157]:
+                - cell "2:12 PM" [ref=e158]
+                - cell "Amlodipine" [ref=e159]
+                - cell "Taken" [ref=e160]
+              - row [ref=e162]:
+                - cell "8:15 AM" [ref=e163]
+                - cell "Metformin" [ref=e164]
+                - cell "Taken" [ref=e165]
+    - text: ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸ ▸

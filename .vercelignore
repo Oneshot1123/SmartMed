@@ -1,0 +1,13 @@
+.agent/
+.env
+.env.local
+.opencode/
+.playwright-mcp/
+__pycache__/
+firmware/
+ml/
+serve.py
+ANALYSIS_EXPLAINED.md
+RESEARCH_BASIS.md
+dashboard/analytics.test.js
+dashboard/ml-risk.test.js

@@ -19,12 +19,10 @@ RTC_DS3231 rtc;
 const int ir1Pin = 32, ir2Pin = 16, ir3Pin = 17, buzzerPin = 13;
 const int greenLed = 18, yellowLed = 19, redLed = 23;
 
-#define WIFI_SSID "Jaineel"
-#define WIFI_PASSWORD "12345678"
-#define API_KEY "AIzaSyDzGt90UApRGj30sj7tNqCAbsfZO2g6358"
-#define DATABASE_URL "https://smartmed-grp27-default-rtdb.asia-southeast1.firebasedatabase.app"
-#define USER_EMAIL "dr@example.com"
-#define USER_PASSWORD "password123"
+#include "secrets.h"
+#if !defined(WIFI_SSID) || !defined(WIFI_PASSWORD) || !defined(API_KEY) || !defined(DATABASE_URL) || !defined(USER_EMAIL) || !defined(USER_PASSWORD)
+  #error "Missing secrets.h - copy secrets.example.h to secrets.h and fill it in."
+#endif
 
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 19800; // India
@@ -116,6 +114,8 @@ void fetchSchedules();
 void reportStatus(String status, const Schedule &s);
 void sendHeartbeat();
 bool isHandDetected(int comp);
+bool handSteady(int comp, unsigned long nowMs, unsigned long needMs);
+void buzzerInit(); void buzzerOn(); void buzzerOff();
 time_t currentEpoch();
 
 bool isHandDetected(int comp) {
@@ -124,6 +124,33 @@ bool isHandDetected(int comp) {
   if (comp == 3) return digitalRead(ir3Pin) == LOW;
   return false;
 }
+
+// ponytail: settle/cooldown tuned for a TCRT5000-style beam; grab ~0.5s vs glitch <50ms
+const unsigned long HAND_SETTLE_MS    = 500;
+const unsigned long HAND_COOLDOWN_MS  = 10000;
+const unsigned long MIN_BEEP_MS       = 2000;
+unsigned long handLowSince[4]      = {0, 0, 0, 0};
+unsigned long handCooldownUntil[4] = {0, 0, 0, 0};
+
+// True only when the beam has been blocked CONTINUOUSLY for needMs. One noisy LOW
+// sample can never log a dose this way; a real pill grab always spans seconds.
+bool handSteady(int comp, unsigned long nowMs, unsigned long needMs) {
+  if (!isHandDetected(comp)) { handLowSince[comp] = 0; return false; }
+  if (handLowSince[comp] == 0) handLowSince[comp] = nowMs;
+  return nowMs - handLowSince[comp] >= needMs;
+}
+
+// 2.7 kHz LEDC tone -- passive piezo discs need AC to sing, active buzzers just get
+// louder. Covers Arduino-ESP32 core v2 (ledcSetup/ledcAttachPin) and v3 (ledcAttach).
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+void buzzerInit() { ledcAttach(buzzerPin, 2700, 10); }
+void buzzerOn()   { ledcWriteTone(buzzerPin, 2700); }
+void buzzerOff()  { ledcWriteTone(buzzerPin, 0); digitalWrite(buzzerPin, LOW); }
+#else
+void buzzerInit() { ledcSetup(0, 2700, 10); ledcAttachPin(buzzerPin, 0); }
+void buzzerOn()   { ledcWriteTone(0, 2700); }
+void buzzerOff()  { ledcWriteTone(0, 0); digitalWrite(buzzerPin, LOW); }
+#endif
 
 // Wall-clock epoch (seconds). NTP when available, RTC otherwise.
 // Never millis() -- that is uptime, which cannot be compared across reboots.
@@ -335,6 +362,7 @@ void setup() {
   pinMode(ir2Pin, INPUT_PULLUP); 
   pinMode(ir3Pin, INPUT_PULLUP);
   pinMode(buzzerPin, OUTPUT); pinMode(greenLed, OUTPUT); pinMode(yellowLed, OUTPUT); pinMode(redLed, OUTPUT);
+  buzzerInit();
 
   if (!rtc.begin()) {
     lcd.clear(); lcd.print("RTC ERROR!");
@@ -414,8 +442,10 @@ void loop() {
       if (!latePending[c]) continue;
       bool crossedMidnight = curH * 60 + curM < lateSched[c].hour * 60 + lateSched[c].minute;
       if (millis() - lateSince[c] > LATE_WINDOW_MS || crossedMidnight) { latePending[c] = false; continue; }
-      if (isHandDetected(c)) {
+      if (millis() > handCooldownUntil[c] && handSteady(c, millis(), HAND_SETTLE_MS)) {
         latePending[c] = false;
+        handLowSince[c] = 0;
+        handCooldownUntil[c] = millis() + HAND_COOLDOWN_MS;
         digitalWrite(greenLed, HIGH);
         lcd.clear(); lcd.print("TAKEN (LATE)"); reportStatus("Taken", lateSched[c]);
         delay(3000); digitalWrite(greenLed, LOW);
@@ -436,6 +466,7 @@ void loop() {
         if (activeCompartment >= 1 && activeCompartment <= 3) latePending[activeCompartment] = false;
         currentState = REMINDER_ACTIVE;
         monitoringStartTime = millis();
+        if (activeCompartment >= 1 && activeCompartment <= 3) handLowSince[activeCompartment] = 0;
         lcd.clear(); lcd.print("DUE: "); lcd.print(schedules[i].medName);
         lcd.setCursor(0,1); lcd.print("TAKE FROM C"); lcd.print(activeCompartment);
         digitalWrite(yellowLed, HIGH);
@@ -458,22 +489,28 @@ void loop() {
     }
   } else {
     // REMINDER_ACTIVE
-    if ((millis() / 500) % 2 == 0) digitalWrite(buzzerPin, HIGH); else digitalWrite(buzzerPin, LOW);
-    
-    if (isHandDetected(activeCompartment)) {
-      digitalWrite(buzzerPin, LOW); digitalWrite(yellowLed, LOW); digitalWrite(greenLed, HIGH);
+    if ((millis() / 500) % 2 == 0) buzzerOn(); else buzzerOff();
+
+    if (activeCompartment >= 1 && activeCompartment <= 3 &&
+        millis() - monitoringStartTime >= MIN_BEEP_MS &&
+        millis() > handCooldownUntil[activeCompartment] &&
+        handSteady(activeCompartment, millis(), HAND_SETTLE_MS)) {
+      buzzerOff(); digitalWrite(yellowLed, LOW); digitalWrite(greenLed, HIGH);
+      handCooldownUntil[activeCompartment] = millis() + HAND_COOLDOWN_MS;
       lcd.clear(); lcd.print("TAKEN!"); reportStatus("Taken", activeSchedule);
       delay(3000); digitalWrite(greenLed, LOW);
       currentState = IDLE; activeCompartment = -1;
     }
 
     if (millis() - monitoringStartTime > MONITORING_DURATION) {
-      digitalWrite(buzzerPin, LOW); digitalWrite(yellowLed, LOW); digitalWrite(redLed, HIGH);
+      buzzerOff(); digitalWrite(yellowLed, LOW); digitalWrite(redLed, HIGH);
       lcd.clear(); lcd.print("MISSED!"); reportStatus("Missed", activeSchedule);
       if (activeCompartment >= 1 && activeCompartment <= 3) {
         lateSched[activeCompartment] = activeSchedule;
         lateSince[activeCompartment] = millis();
         latePending[activeCompartment] = true;
+        handLowSince[activeCompartment] = 0;
+        handCooldownUntil[activeCompartment] = millis() + HAND_COOLDOWN_MS;
       }
       delay(3000); digitalWrite(redLed, LOW);
       currentState = IDLE; activeCompartment = -1;
@@ -485,10 +522,10 @@ void triggerHardwareTest() {
   lcd.clear(); lcd.print("HARDWARE TEST");
   lcd.setCursor(0,1); lcd.print("EXECUTING...");
   digitalWrite(greenLed, HIGH); digitalWrite(yellowLed, HIGH); digitalWrite(redLed, HIGH);
-  digitalWrite(buzzerPin, HIGH);
+  buzzerOn();
   delay(1000);
   digitalWrite(greenLed, LOW); digitalWrite(yellowLed, LOW); digitalWrite(redLed, LOW);
-  digitalWrite(buzzerPin, LOW);
+  buzzerOff();
   lcd.clear(); lcd.print("TEST COMPLETE");
   delay(1000);
 }

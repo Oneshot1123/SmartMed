@@ -157,28 +157,6 @@ header {
   font-size: 0.95rem;
 }
 
-.profile-chip {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--surface);
-  padding: 8px 16px 8px 8px;
-  border-radius: 50px;
-  border: 1px solid var(--surface-border);
-}
-
-.avatar {
-  width: 36px;
-  height: 36px;
-  background: var(--surface-hover);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  color: var(--emerald-heal);
-}
-
 /* Dashboard Grid */
 .grid {
   display: grid;
@@ -200,45 +178,16 @@ header {
   transform: translateY(-4px);
 }
 
-.full-width { grid-column: span 3; }
 .span-2 { grid-column: span 2; }
 
-/* Status Display */
-.status-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-}
-
-.status-badge {
-  padding: 6px 18px;
-  border-radius: 50px;
-  font-weight: 800;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.waiting { background: var(--amber-glow); color: var(--amber-caution); }
 .taken { background: var(--emerald-glow); color: var(--emerald-heal); }
 .missed { background: var(--rose-glow); color: var(--rose-alert); }
-
-.vital-stat {
-  margin-top: 1.5rem;
-}
 
 .vital-label {
   color: var(--text-muted);
   font-size: 0.85rem;
   display: block;
   margin-bottom: 4px;
-}
-
-.vital-value {
-  font-size: 2.5rem;
-  font-weight: 800;
-  letter-spacing: -1px;
 }
 
 /* Charts */
@@ -548,37 +497,6 @@ td {
 }
 
 /* ML risk radar */
-.ml-badge {
-  display: inline-block;
-  vertical-align: middle;
-  margin-left: 6px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--cyan-glow);
-  border: 1px solid var(--cyan-data);
-  color: var(--cyan-data);
-  font-family: 'Inter', sans-serif;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-}
-
-.risk-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 11px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  border: 1px solid currentColor;
-  font-variant-numeric: tabular-nums;
-}
-
-.risk-chip.high { color: var(--rose-alert); background: var(--rose-glow); }
-.risk-chip.medium { color: var(--amber-caution); background: var(--amber-glow); }
-.risk-chip.low { color: var(--emerald-heal); background: var(--emerald-glow); }
-
 .risk-headline {
   margin: 1rem 0 0;
   font-size: 1rem;
@@ -592,22 +510,6 @@ td {
 .risk-headline.warning { color: var(--amber-caution); }
 
 .risk-summary { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-
-.risk-pill {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 6px 11px;
-  border-radius: 10px;
-  border: 1px solid var(--surface-border);
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-
-.risk-pill strong { font-size: 1rem; font-weight: 800; }
-.risk-pill.high strong { color: var(--rose-alert); }
-.risk-pill.medium strong { color: var(--amber-caution); }
-.risk-pill.low strong { color: var(--emerald-heal); }
 
 .risk-list {
   margin-top: 1.25rem;
@@ -710,7 +612,7 @@ td {
 
 @media (max-width: 1100px) {
   .grid { grid-template-columns: minmax(0, 1fr); }
-  .span-2, .span-3, .full-width, .sim-banner { grid-column: span 1; }
+  .span-2, .span-3, .sim-banner { grid-column: span 1; }
 }
 
 /* ==========================================================================
@@ -1031,7 +933,7 @@ summary:focus-visible {
 
   main { padding: 1rem; overflow: visible; gap: 1rem; width: 100%; }
   .grid { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
-  .span-2, .span-3, .full-width, .sim-banner, .dev-tools { grid-column: span 1; }
+  .span-2, .span-3, .sim-banner, .dev-tools { grid-column: span 1; }
   .card { padding: 1.15rem; border-radius: 18px; }
   .page-header { align-items: flex-start; }
   .patient-switch { width: 100%; min-width: 0; }

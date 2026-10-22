@@ -45,19 +45,6 @@
     slot_median_delay_14d: 'usual delay for this slot'
   };
 
-  function mean(values) {
-    var clean = values.filter(function (v) { return typeof v === 'number' && !isNaN(v); });
-    if (!clean.length) return null;
-    return clean.reduce(function (a, b) { return a + b; }, 0) / clean.length;
-  }
-
-  function median(values) {
-    if (!values.length) return null;
-    var sorted = values.slice().sort(function (a, b) { return a - b; });
-    var mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-  }
-
   function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
   }
@@ -128,7 +115,7 @@
     var takingRows = rows.filter(function (row) { return row.P > 0; });
     function rolling(count) {
       var slice = takingRows.slice(-count);
-      var value = mean(slice.map(function (row) { return row.takingPct; }));
+      var value = A.mean(slice.map(function (row) { return row.takingPct; }));
       return value == null ? DEFAULTS.taking : value;
     }
 
@@ -152,7 +139,7 @@
         if (assignment.event && assignment.deltaMin != null) deltas.push(assignment.deltaMin);
       });
     });
-    var lateness = median(deltas);
+    var lateness = A.median(deltas);
     if (lateness == null) lateness = DEFAULTS.medianLateness;
 
     return {
@@ -211,7 +198,7 @@
     slotAssignments.forEach(function (assignment) {
       if (assignment.event && assignment.deltaMin != null) delays.push(assignment.deltaMin);
     });
-    var slotMedianDelay = median(delays);
+    var slotMedianDelay = A.median(delays);
     if (slotMedianDelay == null) slotMedianDelay = 0;
 
     return {
@@ -528,7 +515,7 @@
     var labels = projectedTaking.map(function (_v, index) {
       return A.dateKey(A.addDays(lastDate, index + 2));
     });
-    var projectedAverage = mean(projectedTaking);
+    var projectedAverage = A.mean(projectedTaking);
 
     return {
       labels: labels,
@@ -546,7 +533,6 @@
     if (!MODEL) return null;
     return {
       version: MODEL.version,
-      trained_at: MODEL.trained_at,
       model: MODEL.model,
       simulated_rows: MODEL.data_sources ? MODEL.data_sources.simulated_rows : null,
       real_rows: MODEL.data_sources ? MODEL.data_sources.real_rows : null,
@@ -555,7 +541,6 @@
         ? MODEL.calibration.real.calibration_rows : 0,
       auc: MODEL.metrics && MODEL.metrics.simulated_holdout
         ? MODEL.metrics.simulated_holdout.roc_auc : null,
-      threshold: MODEL.thresholds ? MODEL.thresholds.high : 0.6,
       forecast: MODEL.forecast || null
     };
   }

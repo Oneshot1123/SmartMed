@@ -373,6 +373,12 @@ function formatStamp(value) {
     });
 }
 
+function formatDateKey(key) {
+    if (!key) return '';
+    return SmedAnalytics.parseDateKey(key).toLocaleDateString(undefined,
+        { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 function logDate(log) {
     if (!log || !log.date) return null;
     const d = SmedAnalytics.parseDateKey(log.date);
@@ -407,6 +413,9 @@ function calculateNextDose() {
 
     Object.values(currentSchedules).forEach(s => {
         if (!s || !s.time) return;
+        // A prescribed course that has already run out produces no more doses.
+        const sEndDate = SmedAnalytics.scheduleEndDate(s);
+        if (sEndDate && SmedAnalytics.dateKey(now) > sEndDate) return;
         const schedMinutes = SmedAnalytics.timeToMinutes(s.time);
         if (schedMinutes == null) return;
         const diff = schedMinutes - currentMinutes;
@@ -582,7 +591,18 @@ function buildExplainStats() {
         },
         medicineTimes: Object.values(currentSchedules || {})
             .filter(s => s && s.time)
-            .map(s => `${s.medName} ${formatTimeString(s.time)} (box slot ${s.compartment || '1'})`)
+            .filter(s => {
+                const sEndDate = A.scheduleEndDate(s);
+                return !sEndDate || A.dateKey(new Date()) <= sEndDate;
+            })
+            .map(s => {
+                const courseDays = A.courseDays(s);
+                const sEndDate = A.scheduleEndDate(s);
+                const course = (courseDays != null && sEndDate)
+                    ? `, prescribed for ${courseDays} days until ${sEndDate}`
+                    : '';
+                return `${s.medName} ${formatTimeString(s.time)} (box slot ${s.compartment || '1'})${course}`;
+            })
     };
 
     const latest = latestLog();
@@ -657,12 +677,33 @@ function updateSchedulerUI(scheduleData) {
     }
 
     Object.entries(scheduleData).forEach(([key, s]) => {
+        const A = window.SmedAnalytics;
+        const todayKey = A.dateKey(new Date());
+        const courseDays = A.courseDays(s);
+        const endDate = A.scheduleEndDate(s);
+        const finished = endDate != null && todayKey > endDate;
+
+        let courseLine;
+        if (s.frequency === 'once') {
+            courseLine = 'One-off dose' + (s.date ? ' · ' + formatDateKey(s.date) : '');
+        } else if (finished) {
+            courseLine = `Course finished ${formatDateKey(endDate)}`;
+        } else if (courseDays != null && endDate) {
+            const startKey = s.date || todayKey;
+            const dayNum = Math.round((A.parseDateKey(todayKey) - A.parseDateKey(startKey)) / 86400000) + 1;
+            courseLine = startKey > todayKey
+                ? `Every day · ${courseDays} days from ${formatDateKey(startKey)}`
+                : `Every day · day ${dayNum} of ${courseDays} · until ${formatDateKey(endDate)}`;
+        } else {
+            courseLine = 'Every day · ongoing until deleted';
+        }
+
         const div = document.createElement('div');
-        div.className = 'schedule-item';
+        div.className = 'schedule-item' + (finished ? ' finished' : '');
         div.innerHTML = `
             <div>
-                <h3>${s.medName}</h3>
-                <p class="muted">${formatTimeString(s.time)} · slot ${s.compartment || '1'}</p>
+                <h3>${s.medName}${finished ? ' <span class="finished-tag">Finished</span>' : ''}</h3>
+                <p class="muted">${formatTimeString(s.time)} · slot ${s.compartment || '1'} · ${courseLine}</p>
             </div>
             <button type="button" class="icon-button" onclick="deleteSchedule('${key}')" aria-label="Remove ${s.medName}">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
@@ -694,12 +735,19 @@ function attachSchedulerListeners() {
         const time = document.getElementById('sched-time').value;
         const compartment = document.getElementById('sched-comp').value;
 
-        db.ref(`schedules/${patientID}`).push({
+        // Prescribed course length: 1..365 days, blank = ongoing (doctor's long-term med).
+        const rawDays = parseInt(document.getElementById('sched-days').value, 10);
+        const days = isNaN(rawDays) ? null : Math.min(365, Math.max(1, rawDays));
+
+        const record = {
             medName, time, compartment,
             date: SmedAnalytics.dateKey(new Date()), // local date; toISOString() is UTC
             frequency: "daily",
             active: true
-        }).then(() => {
+        };
+        if (days != null) record.days = days;
+
+        db.ref(`schedules/${patientID}`).push(record).then(() => {
             form.reset();
             showToast(`Schedule added for ${medName}.`);
         }).catch(err => reportDbError('add schedule', err));
@@ -951,11 +999,13 @@ function seedHistory() {
     const startKey = A.dateKey(A.addDays(today, -(days - 1)));
 
     // The analytics ignore days before a schedule's start date, so history seeded before a
-    // schedule created today would never be scored. Backdate daily schedules to the first
-    // seeded day, keeping the real start in seedOrigDate so "Clear simulated data" can put it back.
+    // schedule created today would never be scored. Ongoing daily schedules are backdated
+    // to the first seeded day, keeping the real start in seedOrigDate so "Clear simulated
+    // data" can put it back. A prescribed course keeps its real dates, so simulated data
+    // never falls outside the course the doctor set.
     const startUpdates = {};
     schedules.forEach(s => {
-        if (s.frequency === 'daily' && (!s.date || s.date > startKey)) {
+        if (s.frequency === 'daily' && A.courseDays(s) == null && (!s.date || s.date > startKey)) {
             startUpdates[`${s.key}/date`] = startKey;
             if (!s.seedOrigDate) startUpdates[`${s.key}/seedOrigDate`] = s.date || A.dateKey(today);
             s.date = startKey;
@@ -993,6 +1043,11 @@ function buildSeedPayload(schedules, days) {
             // "once" schedules only fire on their own date
             if (s.frequency !== 'daily' && s.date !== dateStr) return;
             if (s.frequency === 'daily' && s.date && dateStr < s.date) return;
+            // a prescribed course stops after its last day
+            if (s.frequency === 'daily') {
+                const sEndDate = A.scheduleEndDate(s);
+                if (sEndDate && dateStr > sEndDate) return;
+            }
 
             const isEvening = mins >= 19 * 60;
             let pTaken = 0.90;

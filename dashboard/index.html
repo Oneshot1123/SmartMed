@@ -228,7 +228,7 @@
         <header class="page-header">
           <div class="header-title">
             <h1>Medicines</h1>
-            <p>Add each medicine, its time, and its box slot.</p>
+            <p>Add each medicine, its time, its box slot, and how many days.</p>
           </div>
         </header>
 
@@ -252,7 +252,12 @@
                   <option value="3">Slot 3</option>
                 </select>
               </div>
-              <div class="form-actions form-actions-end">
+              <div class="input-group">
+                <label class="vital-label" for="sched-days">Duration (days)</label>
+                <input type="number" id="sched-days" min="1" max="365" step="1" inputmode="numeric" placeholder="e.g. 7 (blank = ongoing)">
+                <small class="form-hint">How many days the doctor prescribed this medicine for. Leave blank for long-term medicines.</small>
+              </div>
+              <div class="form-actions form-actions-end span-2">
                 <button type="submit" class="btn-pill btn-pill-primary">Add medicine</button>
               </div>
             </form>

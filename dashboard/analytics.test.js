@@ -193,5 +193,56 @@ var twoSlots = A.analyse({
 check('dedup: two slots 20 min apart in one compartment both count', twoSlots.rows[0].N, 2);
 check('dedup: nothing removed', twoSlots.summary.duplicatesRemoved, 0);
 
+/* ---------------------------------------------------------------------------
+ * Prescribed courses (`days`)
+ *
+ * A course medicine recurs daily from its start date and STOPS after `days` days
+ * (the doctor's "take this for 7 days"). Ongoing schedules (no `days`) keep the
+ * old forever-daily behaviour.
+ *
+ * Course fixture: Amoxicillin 09:00 starting 2026-03-03 for 3 days, observed over
+ * the same 2026-03-02..2026-03-08 window, plus an ongoing 10:00 control medicine.
+ * ------------------------------------------------------------------------- */
+
+var courseSchedules = {
+  c1: { medName: 'Amoxicillin', time: '09:00', compartment: 1, date: '2026-03-03', frequency: 'daily', days: 3 },
+  c2: { medName: 'Long-term BP', time: '10:00', compartment: 2, date: '2026-03-01', frequency: 'daily' }
+};
+
+var courseRows = A.expandPrescribed(courseSchedules, '2026-03-02', '2026-03-08');
+check('course: none before it starts (03-02)', courseRows['2026-03-02'].length, 1);
+check('course: first dose day (03-03)', courseRows['2026-03-03'].length, 2);
+check('course: second day (03-04)', courseRows['2026-03-04'].length, 2);
+check('course: last day (03-05)', courseRows['2026-03-05'].length, 2);
+check('course: day after it ends (03-06)', courseRows['2026-03-06'].length, 1);
+check('course: week end (03-08)', courseRows['2026-03-08'].length, 1);
+
+var courseAnalysis = A.analyse({}, courseSchedules, 7, { today: '2026-03-08' });
+check('course: total prescribed = control 7 + course 3', courseAnalysis.summary.totalPrescribed, 10);
+check('course: only in-course doses are counted when history is empty',
+  courseAnalysis.summary.totalMissed, 10);
+
+check('course: end date derived (start + days - 1)',
+  A.scheduleEndDate({ medName: 'X', time: '09:00', date: '2026-03-03', frequency: 'daily', days: 3 }),
+  '2026-03-05');
+check('course: single-day course ends on its start',
+  A.scheduleEndDate({ date: '2026-03-03', frequency: 'daily', days: 1 }), '2026-03-03');
+check('course: ongoing schedule has no end',
+  A.scheduleEndDate({ date: '2026-03-03', frequency: 'daily' }), null);
+check('course: one-off schedule ignores days',
+  A.scheduleEndDate({ date: '2026-03-03', frequency: 'once', days: 3 }), null);
+check('course: string days accepted ("7")', A.courseDays({ days: '7' }), 7);
+check('course: zero days means ongoing', A.courseDays({ days: 0 }), null);
+check('course: nonsense days means ongoing', A.courseDays({ days: 'soon' }), null);
+check('course: absurd length capped at a year', A.courseDays({ days: 99999 }), 365);
+
+// A course that began before the observed window must still cut off mid-window.
+var midCourse = A.expandPrescribed({
+  c1: { medName: 'Amoxicillin', time: '09:00', compartment: 1, date: '2026-02-28', frequency: 'daily', days: 7 }
+}, '2026-03-02', '2026-03-08');
+check('course: started earlier still runs inside the window (03-02)', midCourse['2026-03-02'].length, 1);
+check('course: ends on 03-06 (02-28 + 7 days)', midCourse['2026-03-06'].length, 1);
+check('course: nothing on 03-07', midCourse['2026-03-07'].length, 0);
+
 console.log('\n' + (failures ? failures + ' FAILURE(S)' : 'All assertions passed.') + '\n');
 process.exit(failures ? 1 : 0);

@@ -38,7 +38,46 @@ struct Schedule {
   int hour, minute, compartment;
   bool active;
   String frequency; // "once" or "daily"
+  int days;         // prescribed course length, 0 = ongoing (no course)
+  long startEpochDay; // start date as days since 1970-01-01, -1 when the date is unusable
+  long endEpochDay;   // last day of the course, -1 = ongoing until deleted
 };
+
+/*
+ * Days since 1970-01-01 for a civil date. Pure integer math (Howard Hinnant's
+ * days_from_civil): timezone-free, so course bounds agree with the dashboard's local
+ * date keys without any RTC/NTP offset creeping in.
+ */
+long daysFromCivil(long y, int m, int d) {
+  y -= m <= 2;
+  long era = (y >= 0 ? y : y - 399) / 400;
+  long yoe = y - era * 400;                                  // [0, 399]
+  long doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;  // [0, 365]
+  long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;          // [0, 146096]
+  return era * 146097 + doe - 719468;
+}
+
+// "YYYY-MM-DD" -> days since epoch, or -1 when the string is unusable.
+long isoToEpochDay(const String& iso) {
+  if (iso.length() < 10) return -1;
+  long y = iso.substring(0, 4).toInt();
+  int m = iso.substring(5, 7).toInt();
+  int d = iso.substring(8, 10).toInt();
+  if (y < 1970 || m < 1 || m > 12 || d < 1 || d > 31) return -1;
+  return daysFromCivil(y, m, d);
+}
+
+/*
+ * Does this schedule produce a dose on todayDay? Mirrors the dashboard's
+ * expandPrescribed: "once" fires only on its own date; "daily" fires every day from its
+ * start until the prescribed course runs out (no course = until deleted). An unusable
+ * start date means no date gating, keeping the old fire-every-day behaviour.
+ */
+bool doseApplies(const Schedule& s, long todayDay) {
+  if (s.startEpochDay >= 0 && todayDay < s.startEpochDay) return false; // not started yet
+  if (s.frequency == "daily") return s.endEpochDay < 0 || todayDay <= s.endEpochDay;
+  return s.startEpochDay >= 0 && s.startEpochDay == todayDay; // "once"
+}
 
 #define MAX_SCHEDULES 15
 Schedule schedules[MAX_SCHEDULES];
@@ -275,12 +314,33 @@ void fetchSchedules() {
         } else {
           schedules[activeScheduleCount].frequency = "once";
         }
+
+        // Prescribed course: `days` (number or string) bounds the daily repetition;
+        // missing/non-positive = ongoing, firing until deleted as before.
+        schedules[activeScheduleCount].days = 0;
+        schedules[activeScheduleCount].startEpochDay = -1;
+        schedules[activeScheduleCount].endEpochDay = -1;
+        if (sched.get(jd, "days")) {
+          int d = (jd.typeNum == FirebaseJson::JSON_STRING) ? jd.stringValue.toInt() : jd.intValue;
+          if (d > 0) schedules[activeScheduleCount].days = d;
+        }
+        long startDay = isoToEpochDay(schedules[activeScheduleCount].date);
+        if (startDay >= 0) {
+          schedules[activeScheduleCount].startEpochDay = startDay;
+          if (schedules[activeScheduleCount].days > 0) {
+            schedules[activeScheduleCount].endEpochDay = startDay + schedules[activeScheduleCount].days - 1;
+          }
+        }
         
         Serial.print("Loaded ["); Serial.print(activeScheduleCount); Serial.print("]: ");
         Serial.print(schedules[activeScheduleCount].medName);
         Serial.print(" @ "); Serial.print(schedules[activeScheduleCount].hour);
         Serial.print(":"); Serial.print(schedules[activeScheduleCount].minute);
-        Serial.print(" ("); Serial.print(schedules[activeScheduleCount].frequency); Serial.println(")");
+        Serial.print(" ("); Serial.print(schedules[activeScheduleCount].frequency);
+        if (schedules[activeScheduleCount].days > 0) {
+          Serial.print(", "); Serial.print(schedules[activeScheduleCount].days); Serial.print("d course");
+        }
+        Serial.println(")");
         
         activeScheduleCount++;
     }
@@ -302,8 +362,11 @@ void showNextDose(String d, int h, int m) {
   long minDiff = 86400; 
   
   Serial.println("\n--- [NEXT DOSE CALC] ---");
+  long todayDay = isoToEpochDay(d);
   for (int i=0; i < activeScheduleCount; i++) {
-    bool dateMatch = (schedules[i].date == d || schedules[i].frequency == "daily");
+    bool dateMatch = (todayDay >= 0)
+        ? doseApplies(schedules[i], todayDay)
+        : (schedules[i].date == d || schedules[i].frequency == "daily");
     if (dateMatch) {
       long diff = (schedules[i].hour * 60 + schedules[i].minute) - (h * 60 + m);
       Serial.print("Check: "); Serial.print(schedules[i].medName); 
@@ -427,6 +490,7 @@ void loop() {
     curY = now.year(); curMo = now.month(); curD = now.day();
   }
   sprintf(curDate, "%04d-%02d-%02d", curY, curMo, curD);
+  long todayDay = daysFromCivil((long)curY, curMo, curD);
   
   sendHeartbeat();
   static unsigned long lastSync = 0;
@@ -455,7 +519,7 @@ void loop() {
     // Check Alerts
     for (int i=0; i < activeScheduleCount; i++) {
       bool timeMatch = (schedules[i].hour == curH && schedules[i].minute == curM);
-      bool dateMatch = (schedules[i].date == curDate || schedules[i].frequency == "daily");
+      bool dateMatch = doseApplies(schedules[i], todayDay);
       bool isNewMinute = (curH != lastAlarmHour || curM != lastAlarmMinute);
       
       if (timeMatch && dateMatch && isNewMinute) {

@@ -800,6 +800,7 @@ summary:focus-visible {
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.25rem; }
 .form-actions { display: flex; gap: 0.75rem; justify-content: flex-end; align-items: flex-end; }
 .form-actions-end { align-self: end; }
+.form-hint { display: block; margin-top: 0.3rem; color: var(--text-muted); font-size: 0.75rem; line-height: 1.35; }
 .add-form-card { margin-top: 1.5rem; border: 1px solid var(--cyan-data); }
 .patients-grid { margin-top: 1.5rem; }
 .active-tag { display: inline-block; font-size: 0.7rem; background: var(--emerald-heal); color: var(--bg-primary); padding: 2px 8px; border-radius: 10px; vertical-align: middle; margin-left: 6px; }
@@ -809,6 +810,8 @@ summary:focus-visible {
 .schedule-item { background: var(--bg-primary); padding: 1rem; border-radius: 12px; border: 1px solid var(--surface-border); border-left: 4px solid var(--cyan-data); display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
 .schedule-item h3 { font-size: 0.95rem; }
 .schedule-item p { font-size: 0.78rem; }
+.schedule-item.finished { border-left-color: var(--surface-border); opacity: 0.75; }
+.finished-tag { display: inline-block; font-size: 0.7rem; background: var(--text-muted); color: var(--bg-primary); padding: 2px 8px; border-radius: 10px; vertical-align: middle; margin-left: 6px; }
 .icon-button { background: none; border: none; color: var(--rose-alert); cursor: pointer; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; }
 .icon-button:hover { background: var(--rose-glow); }
 

@@ -151,10 +151,35 @@
   /*
    * Expand the schedule definitions into the doses due on each date in the window.
    *
-   * frequency "daily" recurs every day from its start date onward; "once" applies only on
-   * its own date. A schedule with no usable time is skipped rather than counted as a dose
-   * that could never be taken.
+   * frequency "daily" recurs every day from its start date onward, but only up to the end
+   * of its prescribed course: a schedule carrying `days` (e.g. 7) stops after that many
+   * days, one day per day. Schedules without `days` are ongoing and recur until deleted.
+   * "once" applies only on its own date. A schedule with no usable time is skipped rather
+   * than counted as a dose that could never be taken.
    */
+
+  /*
+   * Normalised course length of a schedule: a positive integer of days, or null when the
+   * schedule has no finite course (ongoing) or carries a nonsensical value. Accepts numeric
+   * or string values ("7") because Firebase field types are trusted on read.
+   */
+  function courseDays(s) {
+    var d = s && s.days != null ? parseInt(s.days, 10) : NaN;
+    if (isNaN(d) || d < 1) return null;
+    return Math.min(365, d);
+  }
+
+  /*
+   * Last day of a schedule's course as a "YYYY-MM-DD" key, or null when the schedule is
+   * ongoing (no usable `days`) or a one-off. Used by the dashboard to label courses.
+   */
+  function scheduleEndDate(s) {
+    if (!s || s.frequency === 'once') return null;
+    var days = courseDays(s);
+    if (s.date && days !== null) return dateKey(addDays(parseDateKey(s.date), days - 1));
+    return null;
+  }
+
   function expandPrescribed(schedules, fromKey, toKey) {
     var byDate = {};
     var from = parseDateKey(fromKey);
@@ -181,10 +206,15 @@
 
       if (s.frequency === 'daily') {
         // Recurs from its start date. A schedule created today does not retroactively
-        // make yesterday a missed dose, so days before `s.date` get nothing.
+        // make yesterday a missed dose, so days before `s.date` get nothing. A course
+        // (`days`) stops after its last day; without one it runs until deleted.
         var start = s.date ? parseDateKey(s.date) : from;
+        var length = courseDays(s);
+        var end = length !== null ? addDays(start, length - 1) : null;
         Object.keys(byDate).forEach(function (k) {
-          if (parseDateKey(k) >= start) byDate[k].push(slot);
+          if (parseDateKey(k) < start) return;
+          if (end !== null && parseDateKey(k) > end) return;
+          byDate[k].push(slot);
         });
       } else if (s.date && byDate[s.date]) {
         byDate[s.date].push(slot);
@@ -560,6 +590,8 @@
     missByHourWeekday: missByHourWeekday,
     latenessStats: latenessStats,
     expandPrescribed: expandPrescribed,
+    courseDays: courseDays,
+    scheduleEndDate: scheduleEndDate,
     dedupeActuations: dedupeActuations,
     normaliseHistory: normaliseHistory,
     toCSV: toCSV,

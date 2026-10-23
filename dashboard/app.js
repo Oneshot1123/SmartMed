@@ -477,11 +477,16 @@ function renderToday() {
         } else {
             prescribed.forEach(slot => {
                 const assignment = assignments.find(a => a.slot.id === slot.id);
+                // Labels mirror the recent-dose table so the two always agree:
+                // taken > explicit missed record > no record yet > later today.
                 let label = 'Later';
                 let cls = 'pending';
                 if (assignment && assignment.event) {
                     label = 'Taken';
                     cls = 'taken';
+                } else if (assignment && assignment.missedRecord) {
+                    label = 'Missed';
+                    cls = 'missed';
                 } else if (assignment) {
                     label = 'No record';
                     cls = 'missed';
@@ -890,6 +895,9 @@ function renderDoseJournal(historyData) {
                         chip.classList.add('taken');
                         chip.textContent = 'Taken';
                     }
+                } else if (a.missedRecord) {
+                    chip.classList.add('missed');
+                    chip.textContent = 'Missed';
                 } else {
                     chip.classList.add('missed');
                     chip.textContent = 'No record';

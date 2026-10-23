@@ -234,19 +234,39 @@
    *
    * Two passes, so the reliable signal wins:
    *   1. Exact — events carrying scheduledTime (post-firmware-change) bind to the slot at
-   *      that time, preferring a matching compartment when both sides have one.
+   *      that time, preferring a matching compartment when both sides have one. Real "Missed"
+   *      records (which the firmware also writes with a scheduledTime) are bound the same way
+   *      as `missedRecord` markers so the Today chips can say "Missed" like the recent-dose
+   *      table does. They never enter the numerator: only Taken events do.
    *   2. Proximity — legacy events with no scheduledTime bind to the nearest still-unclaimed
    *      slot. Ambiguous by nature, which is exactly why the firmware now records the slot.
+   *      On today's row this pass never reaches into the future: a guessed take may not claim
+   *      a slot that is not yet due (+ one on-time window of grace for early takers), and it
+   *      may not overwrite a slot that carries a real missed record.
    *
    * Each slot can be claimed once. Surplus events beyond the prescribed count are returned
    * as `extra` rather than silently inflating the numerator.
    */
-  function matchDay(slots, events) {
+  function matchDay(slots, events, opts) {
+    var nowCutoff = opts && opts.nowMinutes != null ? opts.nowMinutes : null;
     var assignments = slots.map(function (slot) {
-      return { slot: slot, event: null, onTime: false, deltaMin: null };
+      return { slot: slot, event: null, missedRecord: null, onTime: false, deltaMin: null };
     });
     var extra = [];
     var pending = [];
+
+    // Real missed records: bind exactly, for display only. A slot claimed by one cannot be
+    // silently overridden by a later proximity guess.
+    events.forEach(function (ev) {
+      if (ev.taken || ev.scheduledMinutes === null) return;
+      for (var i = 0; i < assignments.length; i++) {
+        var a = assignments[i];
+        if (a.missedRecord || a.slot.minutes !== ev.scheduledMinutes) continue;
+        if (ev.compartment && a.slot.compartment && ev.compartment !== a.slot.compartment) continue;
+        a.missedRecord = ev;
+        break;
+      }
+    });
 
     events.forEach(function (ev) {
       if (!ev.taken) return; // Missed records inform the heatmap, never the numerator
@@ -272,8 +292,11 @@
     pending.forEach(function (ev) {
       var best = -1, bestDist = Infinity;
       assignments.forEach(function (a, i) {
-        if (a.event) return;
+        if (a.event || a.missedRecord) return;
         if (ev.compartment && a.slot.compartment && ev.compartment !== a.slot.compartment) return;
+        // A take without a scheduledTime is a guess. Never let a guess reach into the
+        // future (beyond the on-time window, for pills taken early) on today's row.
+        if (nowCutoff !== null && a.slot.minutes > nowCutoff + TIMING_WINDOW_MIN) return;
         var dist = Math.abs(ev.minutes - a.slot.minutes);
         if (dist < bestDist) { bestDist = dist; best = i; }
       });
@@ -315,7 +338,10 @@
     var rows = Object.keys(prescribed).sort().map(function (key) {
       var slots = prescribed[key];
       var dayEvents = eventsByDate[key] || [];
-      var matched = matchDay(slots, dayEvents);
+      // The match cutoff only applies to today's row: stray legacy/simulated events must
+      // not claim doses that are not due yet.
+      var matching = key === toKey && nowMinutes != null ? { nowMinutes: nowMinutes } : null;
+      var matched = matchDay(slots, dayEvents, matching);
       var assignments = matched.assignments;
 
       // Today's doses that are not due yet are neither taken nor missed. Keep one only if

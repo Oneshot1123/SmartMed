@@ -244,5 +244,50 @@ check('course: started earlier still runs inside the window (03-02)', midCourse[
 check('course: ends on 03-06 (02-28 + 7 days)', midCourse['2026-03-06'].length, 1);
 check('course: nothing on 03-07', midCourse['2026-03-07'].length, 0);
 
+/* ---------------------------------------------------------------------------
+ * Chip agreement: what the Today card says must match what the recent-dose
+ * table says. The table renders raw log rows, so "Missed" stays "Missed" there;
+ * the Today card derives its chips from buildDailyTable. Two rules make the
+ * two agree:
+ *   1. Records the firmware wrote as Missed (scheduledTime present) bind to
+ *      their slot as missedRecord markers — display only, numerator untouched.
+ *   2. Takes with no scheduledTime (simulator / legacy) are guesses and may
+ *      never claim a slot that is not due yet, nor overwrite a real missed
+ *      record. Before this rule a stray take could make a freshly scheduled
+ *      medicine show "Taken" hours before it was due.
+ * ------------------------------------------------------------------------- */
+
+// today = 2026-03-08, "now" = 14:10 (850). Past dose 08:00, new dose 20:30.
+var chipSchedules = {
+  base: { medName: 'Base Med', time: '08:00', compartment: 1, date: '2026-03-08', frequency: 'daily' },
+  fresh: { medName: 'New Med', time: '20:30', compartment: 2, date: '2026-03-08', frequency: 'daily' }
+};
+
+var chipDay = A.buildDailyTable({
+  m1: ev('2026-03-08', '08:01', 'Missed', '08:00', 1)
+}, chipSchedules, '2026-03-08', '2026-03-08', null, 850)[0];
+check('chip: real missed record binds to its slot', !!chipDay.assignments[0].missedRecord, true);
+check('chip: missed record is display-only (N not credited)', chipDay.N, 0);
+
+// The reported bug: a take with no scheduledTime, all past slots claimed, so the
+// guess would previously land on the future 20:30 slot of a NEW medicine.
+var guarded = A.buildDailyTable({
+  real: ev('2026-03-08', '08:05', 'Taken', '08:00', 1),
+  stray: ev('2026-03-08', '14:05', 'Taken')
+}, chipSchedules, '2026-03-08', '2026-03-08', null, 850)[0];
+check('chip: stray take cannot claim a slot that is not due yet', guarded.N, 1);
+check('chip: new future medicine stays "Later" (not Taken)', guarded.assignments.length, 1);
+
+// Same-day agreement: missed 08:00 + stray take at 14:05. The old proximity pass
+// bound the stray to 08:00 and the chip read "Taken" while the table said "Missed".
+var agree = A.buildDailyTable({
+  m1: ev('2026-03-08', '08:01', 'Missed', '08:00', 1),
+  s1: ev('2026-03-08', '14:05', 'Taken')
+}, chipSchedules, '2026-03-08', '2026-03-08', null, 850)[0];
+check('chip: stray take cannot overwrite a real missed record', agree.N, 0);
+check('chip: Today card says Missed for the 08:00 dose', !!agree.assignments[0].missedRecord, true);
+check('chip: no event bound to the missed slot', !!agree.assignments[0].event, false);
+check('chip: future dose untouched by stray', agree.assignments.length, 1);
+
 console.log('\n' + (failures ? failures + ' FAILURE(S)' : 'All assertions passed.') + '\n');
 process.exit(failures ? 1 : 0);
